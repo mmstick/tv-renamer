@@ -30,7 +30,7 @@ impl Digits for usize {
     fn to_padded_string(&self, pad: char, limit: usize) -> String {
         if self.digits() < limit {
             let mut output = String::with_capacity(limit);
-            output.push_str(&iter::repeat(pad).take(limit - 1).collect::<String>());
+            output.push_str(&iter::repeat(pad).take(limit - self.digits()).collect::<String>());
             output.push_str(&self.to_string());
             output
         } else {
@@ -96,4 +96,13 @@ impl<T> Try for Option<T> {
             process::exit(1);
         })
     }
+}
+
+#[test]
+fn test_digits() {
+    assert_eq!(  5.to_padded_string('0', 2).as_str(), "05");
+    assert_eq!( 10.to_padded_string('0', 2).as_str(), "10");
+    assert_eq!(100.to_padded_string('0', 2).as_str(), "100");
+    assert_eq!( 10.to_padded_string('0', 3).as_str(), "010");
+    assert_eq!(  5.to_padded_string('0', 3).as_str(), "005");
 }

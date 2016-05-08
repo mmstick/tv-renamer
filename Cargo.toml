@@ -5,7 +5,7 @@ authors = ["Michael Aaron Murphy <mmstickman@gmail.com>"]
 description = "A TV series renaming application that supports adding titles to episodes using TVDB and sports a CLI and optional GTK3 interface"
 repository = "https://github.com/mmstick/tv-renamer"
 readme = "README.md"
-keywords = ["gtk", "media", "rename", "tvdb"]
+keywords = ["gtk", "media", "rename", "tv", "tvdb"]
 license = "LGPL-3.0"
 
 [features]
