@@ -144,14 +144,14 @@ pub fn launch() {
                 match common::get_seasons(&program.directory) {
                     Ok(seasons) => {
                         preview_list.clear();
-                        for season in seasons.map(|x| x.as_os_str().to_str().unwrap()) {
+                        for season in seasons {
                             match common::derive_season_number(&season) {
                                 Some(number) => program.season_number = number,
                                 None         => continue
                             }
-                            match common::get_episodes(season) {
+                            match common::get_episodes(season.as_os_str().to_str().unwrap()) {
                                 Ok(episodes) => {
-                                    match program.get_targets(season, &episodes, program.episode_count) {
+                                    match program.get_targets(season.as_os_str().to_str().unwrap(), &episodes, program.episode_count) {
                                         Ok(targets) => {
                                             for (source, target) in episodes.iter().zip(targets) {
                                                 let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
@@ -236,14 +236,14 @@ pub fn launch() {
                 match common::get_seasons(&program.directory) {
                     Ok(seasons) => {
                         preview_list.clear();
-                        for season in seasons.map(|x| x.as_os_str().to_str().unwrap()) {
+                        for season in seasons {
                             match common::derive_season_number(&season) {
                                 Some(number) => program.season_number = number,
                                 None         => continue
                             }
-                            match common::get_episodes(season) {
+                            match common::get_episodes(season.as_os_str().to_str().unwrap()) {
                                 Ok(episodes) => {
-                                    match program.get_targets(season, &episodes, program.episode_count) {
+                                    match program.get_targets(season.as_os_str().to_str().unwrap(), &episodes, program.episode_count) {
                                         Ok(targets) => {
                                             // Append the current time to the log if logging is enabled.
                                             if program.log_changes {
