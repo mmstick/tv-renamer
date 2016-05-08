@@ -128,6 +128,23 @@ pub fn shorten_path(path: &Path) -> PathBuf {
     }
 }
 
+/// Given a directory path, derive the number of the season and assign it.
+pub fn derive_season_number(season: &Path) -> Option<usize> {
+    let mut directory_name = season.file_name().unwrap().to_str().unwrap().to_lowercase();
+    match directory_name.as_str() {
+        "season0" | "season 0" | "specials" => Some(0),
+        _ => {
+            directory_name = directory_name.replace("season", "");
+            directory_name = directory_name.replace(" ", "");
+            if let Ok(season_number) = directory_name.parse::<usize>() {
+                Some(season_number)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 /// Collects a list of all of the seasons in a given directory.
 pub fn get_seasons(directory: &str) -> Result<Vec<PathBuf>, &str> {
     if let Ok(files) = fs::read_dir(directory) {

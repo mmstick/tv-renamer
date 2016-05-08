@@ -55,18 +55,10 @@ impl CLI for Arguments {
                 Err(err) => panic!("{}", err)
             };
             for season in seasons {
-                let mut directory_name = season.file_name().unwrap().to_str().unwrap().to_lowercase();
-                match directory_name.as_str() {
-                    "season0" | "season 0" | "specials" => self.season_number = 0,
-                    _ => {
-                        directory_name = directory_name.replace("season", "");
-                        directory_name = directory_name.replace(" ", "");
-                        if let Ok(season_number) = directory_name.parse::<usize>() {
-                            self.season_number = season_number;
-                        }
-                    }
+                if let Some(number) = common::derive_season_number(&season) {
+                    self.season_number = number;
+                    self.rename_episodes(&season, stderr, stdout);
                 }
-                self.rename_episodes(&season, stderr, stdout);
             }
         } else {
             self.rename_episodes(Path::new(&self.directory), stderr, stdout);

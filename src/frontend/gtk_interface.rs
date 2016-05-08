@@ -16,6 +16,7 @@ use std::path::PathBuf;
 // - Implement GTK3 notifications for when errors occur, and when renaming has completed successfully
 // - Add a tab for checking the rename log.
 // - Add support for a configuration file.
+// - Reduce source code redundancy with macros and functions.
 
 pub fn launch() {
     gtk::init().unwrap_or_else(|_| panic!("tv-renamer: failed to initialize GTK."));
@@ -143,21 +144,14 @@ pub fn launch() {
                 match common::get_seasons(&program.directory) {
                     Ok(seasons) => {
                         preview_list.clear();
-                        for season in seasons {
-                            let mut directory_name = season.file_name().unwrap().to_str().unwrap().to_lowercase();
-                            match directory_name.as_str() {
-                                "season0" | "season 0" | "specials" => program.season_number = 0,
-                                _ => {
-                                    directory_name = directory_name.replace("season", "");
-                                    directory_name = directory_name.replace(" ", "");
-                                    if let Ok(season_number) = directory_name.parse::<usize>() {
-                                        program.season_number = season_number;
-                                    }
-                                }
+                        for season in seasons.map(|x| x.as_os_str().to_str().unwrap()) {
+                            match common::derive_season_number(&season) {
+                                Some(number) => program.season_number = number,
+                                None         => continue
                             }
-                            match common::get_episodes(season.as_os_str().to_str().unwrap()) {
+                            match common::get_episodes(season) {
                                 Ok(episodes) => {
-                                    match program.get_targets(season.as_os_str().to_str().unwrap(), &episodes, program.episode_count) {
+                                    match program.get_targets(season, &episodes, program.episode_count) {
                                         Ok(targets) => {
                                             for (source, target) in episodes.iter().zip(targets) {
                                                 let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
@@ -242,21 +236,14 @@ pub fn launch() {
                 match common::get_seasons(&program.directory) {
                     Ok(seasons) => {
                         preview_list.clear();
-                        for season in seasons {
-                            let mut directory_name = season.file_name().unwrap().to_str().unwrap().to_lowercase();
-                            match directory_name.as_str() {
-                                "season0" | "season 0" | "specials" => program.season_number = 0,
-                                _ => {
-                                    directory_name = directory_name.replace("season", "");
-                                    directory_name = directory_name.replace(" ", "");
-                                    if let Ok(season_number) = directory_name.parse::<usize>() {
-                                        program.season_number = season_number;
-                                    }
-                                }
+                        for season in seasons.map(|x| x.as_os_str().to_str().unwrap()) {
+                            match common::derive_season_number(&season) {
+                                Some(number) => program.season_number = number,
+                                None         => continue
                             }
-                            match common::get_episodes(season.as_os_str().to_str().unwrap()) {
+                            match common::get_episodes(season) {
                                 Ok(episodes) => {
-                                    match program.get_targets(season.as_os_str().to_str().unwrap(), &episodes, program.episode_count) {
+                                    match program.get_targets(season, &episodes, program.episode_count) {
                                         Ok(targets) => {
                                             // Append the current time to the log if logging is enabled.
                                             if program.log_changes {
