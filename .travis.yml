@@ -1,9 +1,14 @@
 language: rust
-env:
-    - GTK=3.4
-    - GTK=3.18
 addons:
   apt:
     packages:
     - libgtk-3-dev
-script: cargo build --verbose --features "enable_gtk"
+script:
+    # Update GTK3 in Docker image
+    - cd "$HOME"
+    - curl -LO "https://github.com/gkoz/gtk-bootstrap/releases/download/gtk-3.18.1-2/deps.txz"
+    - tar xf deps.txz
+    - cd "$WD"
+    - export PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
+    # Build the application
+    - cargo build --verbose --features "enable_gtk"
