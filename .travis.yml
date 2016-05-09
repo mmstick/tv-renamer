@@ -1,0 +1,6 @@
+language: rust
+addons:
+  apt:
+    packages:
+    - libgtk-3-dev
+script: cargo build --verbose --features "enable_gtk"

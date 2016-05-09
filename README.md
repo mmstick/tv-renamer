@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/mmstick/tv-renamer.png?branch=master)](https://travis-ci.org/mmstick/tv-renamer)
+
 # Installation Instructions
 
 With Rust installed, simply execute `cargo install --git https://github.com/mmstick/tv-renamer` to install with just CLI support. To enable the GTK3 front-end which may be called with the `--gui` flag, simply enable the `enable_gtk` feature with `cargo install --git https://github.com/mmstick/tv-renamer --features "enable_gtk"`.
