@@ -5,6 +5,7 @@ addons:
     - libgtk-3-dev
 script:
     # Update GTK3 in Docker image
+    - WD="$PWD"
     - cd "$HOME"
     - curl -LO "https://github.com/gkoz/gtk-bootstrap/releases/download/gtk-3.18.1-2/deps.txz"
     - tar xf deps.txz
