@@ -1,5 +1,6 @@
 language: rust
 env:
+    - GTK=3.4
     - GTK=3.18
 addons:
   apt:

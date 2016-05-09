@@ -91,8 +91,109 @@ pub fn launch() {
     preview_tree.set_model(Some(&preview_list));
     preview_tree.set_headers_visible(true);
 
+    { // NOTE: Update the preview when the Automatic checkbutton is modified
+        let auto                = automatic_check.clone();
+        let no_name             = no_name_check.clone();
+        let tvdb                = tvdb_check.clone();
+        let log_changes         = log_changes_check.clone();
+        let season_spin_button  = season_spin_button.clone();
+        let episode_spin_button = episode_spin_button.clone();
+        let series_entry        = series_name_entry.clone();
+        let directory_entry     = series_directory_entry.clone();
+        let preview_list        = preview_list.clone();
+        automatic_check.connect_clicked(move |_| {
+            if let Some(directory) = directory_entry.get_text() {
+                let mut program = &mut Arguments {
+                    automatic:     auto.get_active(),
+                    dry_run:       false,
+                    log_changes:   log_changes.get_active(),
+                    no_name:       no_name.get_active(),
+                    tvdb:          tvdb.get_active(),
+                    verbose:       false,
+                    directory:     directory,
+                    series_name:   series_entry.get_text().unwrap_or(String::new()),
+                    season_number: season_spin_button.get_value_as_int() as usize,
+                    episode_count: episode_spin_button.get_value_as_int() as usize,
+                    pad_length:    2,
+                };
+
+                if !program.directory.is_empty() { program.update_preview(&preview_list); }
+            }
+        });
+    }
+
+    { // NOTE: Update the preview when the TVDB checkbutton is modified
+        let auto                = automatic_check.clone();
+        let no_name             = no_name_check.clone();
+        let tvdb                = tvdb_check.clone();
+        let log_changes         = log_changes_check.clone();
+        let season_spin_button  = season_spin_button.clone();
+        let episode_spin_button = episode_spin_button.clone();
+        let series_entry        = series_name_entry.clone();
+        let directory_entry     = series_directory_entry.clone();
+        let preview_list        = preview_list.clone();
+        tvdb_check.connect_clicked(move |_| {
+            if let Some(directory) = directory_entry.get_text() {
+                let mut program = &mut Arguments {
+                    automatic:     auto.get_active(),
+                    dry_run:       false,
+                    log_changes:   log_changes.get_active(),
+                    no_name:       no_name.get_active(),
+                    tvdb:          tvdb.get_active(),
+                    verbose:       false,
+                    directory:     directory,
+                    series_name:   series_entry.get_text().unwrap_or(String::new()),
+                    season_number: season_spin_button.get_value_as_int() as usize,
+                    episode_count: episode_spin_button.get_value_as_int() as usize,
+                    pad_length:    2,
+                };
+
+                if !program.directory.is_empty() { program.update_preview(&preview_list); }
+            }
+        });
+    }
+
+    { // NOTE: Update the preview when the "No Name In Series" checkbutton is modified
+        let auto                = automatic_check.clone();
+        let no_name             = no_name_check.clone();
+        let tvdb                = tvdb_check.clone();
+        let log_changes         = log_changes_check.clone();
+        let season_spin_button  = season_spin_button.clone();
+        let episode_spin_button = episode_spin_button.clone();
+        let series_entry        = series_name_entry.clone();
+        let directory_entry     = series_directory_entry.clone();
+        let preview_list        = preview_list.clone();
+        no_name_check.connect_clicked(move |_| {
+            if let Some(directory) = directory_entry.get_text() {
+                let mut program = &mut Arguments {
+                    automatic:     auto.get_active(),
+                    dry_run:       false,
+                    log_changes:   log_changes.get_active(),
+                    no_name:       no_name.get_active(),
+                    tvdb:          tvdb.get_active(),
+                    verbose:       false,
+                    directory:     directory,
+                    series_name:   series_entry.get_text().unwrap_or(String::new()),
+                    season_number: season_spin_button.get_value_as_int() as usize,
+                    episode_count: episode_spin_button.get_value_as_int() as usize,
+                    pad_length:    2,
+                };
+
+                if !program.directory.is_empty() { program.update_preview(&preview_list); }
+            }
+        });
+    }
+
     { // NOTE: Programs the Choose Directory button with a File Chooser Dialog.
-        let directory_entry = series_directory_entry.clone();
+        let auto                = automatic_check.clone();
+        let no_name             = no_name_check.clone();
+        let tvdb                = tvdb_check.clone();
+        let log_changes         = log_changes_check.clone();
+        let season_spin_button  = season_spin_button.clone();
+        let episode_spin_button = episode_spin_button.clone();
+        let series_entry        = series_name_entry.clone();
+        let directory_entry     = series_directory_entry.clone();
+        let preview_list        = preview_list.clone();
         series_directory_button.connect_clicked(move |_| {
             // Open file chooser dialog to modify series_directory_entry.
             let dialog = FileChooserDialog::new (
@@ -109,6 +210,24 @@ pub fn launch() {
                 }
             }
             dialog.destroy();
+
+            if let Some(directory) = directory_entry.get_text() {
+                let mut program = &mut Arguments {
+                    automatic:     auto.get_active(),
+                    dry_run:       false,
+                    log_changes:   log_changes.get_active(),
+                    no_name:       no_name.get_active(),
+                    tvdb:          tvdb.get_active(),
+                    verbose:       false,
+                    directory:     directory,
+                    series_name:   series_entry.get_text().unwrap_or(String::new()),
+                    season_number: season_spin_button.get_value_as_int() as usize,
+                    episode_count: episode_spin_button.get_value_as_int() as usize,
+                    pad_length:    2,
+                };
+
+                if !program.directory.is_empty() { program.update_preview(&preview_list); }
+            }
         });
     }
 
@@ -124,82 +243,22 @@ pub fn launch() {
         let directory_entry     = series_directory_entry.clone();
         let preview_list        = preview_list.clone();
         button.connect_clicked(move |_| {
-            let mut program = Arguments {
-                automatic:     auto.get_active(),
-                dry_run:       false,
-                log_changes:   log_changes.get_active(),
-                no_name:       no_name.get_active(),
-                tvdb:          tvdb.get_active(),
-                verbose:       false,
-                directory:     directory_entry.get_text().unwrap(),
-                series_name:   series_entry.get_text().unwrap(),
-                season_number: season_spin_button.get_value_as_int() as usize,
-                episode_count: episode_spin_button.get_value_as_int() as usize,
-                pad_length:    2,
-            };
-
-            if program.automatic {
-                let series = PathBuf::from(&program.directory);
-                program.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                match common::get_seasons(&program.directory) {
-                    Ok(seasons) => {
-                        preview_list.clear();
-                        for season in seasons {
-                            match common::derive_season_number(&season) {
-                                Some(number) => program.season_number = number,
-                                None         => continue
-                            }
-                            match common::get_episodes(season.as_os_str().to_str().unwrap()) {
-                                Ok(episodes) => {
-                                    match program.get_targets(season.as_os_str().to_str().unwrap(), &episodes, program.episode_count) {
-                                        Ok(targets) => {
-                                            for (source, target) in episodes.iter().zip(targets) {
-                                                let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                                let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                                preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
-                                            }
-                                        },
-                                        Err(err) => {
-                                            // Dialog of Error?
-                                            println!("{:?}", err);
-                                        }
-                                    };
-                                },
-                                Err(err) => {
-                                    // Dialog of Error?
-                                    println!("{:?}", err);
-                                }
-                            };
-                        }
-                    },
-                    Err(err) => {
-                        // Dialog of Error?
-                        println!("{:?}", err);
-                    }
-                }
-            } else {
-                match common::get_episodes(&program.directory) {
-                    Ok(episodes) => {
-                        match program.get_targets(&program.directory, &episodes, program.episode_count) {
-                            Ok(targets) => {
-                                preview_list.clear();
-                                for (source, target) in episodes.iter().zip(targets) {
-                                    let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                    let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                    preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
-                                }
-                            },
-                            Err(err) => {
-                                // Dialog of Error?
-                                println!("{:?}", err);
-                            }
-                        };
-                    },
-                    Err(err) => {
-                        // Dialog of Error?
-                        println!("{:?}", err);
-                    }
+            if let Some(directory) = directory_entry.get_text() {
+                let mut program = &mut Arguments {
+                    automatic:     auto.get_active(),
+                    dry_run:       false,
+                    log_changes:   log_changes.get_active(),
+                    no_name:       no_name.get_active(),
+                    tvdb:          tvdb.get_active(),
+                    verbose:       false,
+                    directory:     directory,
+                    series_name:   series_entry.get_text().unwrap_or(String::new()),
+                    season_number: season_spin_button.get_value_as_int() as usize,
+                    episode_count: episode_spin_button.get_value_as_int() as usize,
+                    pad_length:    2,
                 };
+
+                if !program.directory.is_empty() { program.update_preview(&preview_list); }
             }
         });
     }
@@ -216,147 +275,22 @@ pub fn launch() {
         let directory_entry     = series_directory_entry.clone();
         let preview_list        = preview_list.clone();
         button.connect_clicked(move |_| {
-            let mut program = Arguments {
-                automatic:     auto.get_active(),
-                dry_run:       false,
-                log_changes:   log_changes.get_active(),
-                no_name:       no_name.get_active(),
-                tvdb:          tvdb.get_active(),
-                verbose:       false,
-                directory:     directory_entry.get_text().unwrap(),
-                series_name:   series_entry.get_text().unwrap(),
-                season_number: season_spin_button.get_value_as_int() as usize,
-                episode_count: episode_spin_button.get_value_as_int() as usize,
-                pad_length:    2,
-            };
-
-            if program.automatic {
-                let series = PathBuf::from(&program.directory);
-                program.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                match common::get_seasons(&program.directory) {
-                    Ok(seasons) => {
-                        preview_list.clear();
-                        for season in seasons {
-                            match common::derive_season_number(&season) {
-                                Some(number) => program.season_number = number,
-                                None         => continue
-                            }
-                            match common::get_episodes(season.as_os_str().to_str().unwrap()) {
-                                Ok(episodes) => {
-                                    match program.get_targets(season.as_os_str().to_str().unwrap(), &episodes, program.episode_count) {
-                                        Ok(targets) => {
-                                            // Append the current time to the log if logging is enabled.
-                                            if program.log_changes {
-                                                let mut log_path = ::std::env::home_dir()
-                                                    .try(b"unable to get home directory: ", &mut io::stderr());
-                                                log_path.push("tv-renamer.log");
-                                                let mut log = fs::OpenOptions::new().create(true).append(true).open(&log_path)
-                                                    .try(b"unable to open log: ", &mut io::stderr());
-                                                let local_time = Local::now().to_rfc2822();
-                                                let _ = log.write(b"\n");
-                                                let _ = log.write_all(local_time.as_bytes());
-                                                let _ = log.write(b"\n");
-                                                let _ = log.flush();
-                                            }
-
-                                            // Clear the preview and then update it
-                                            preview_list.clear();
-                                            for (source, target) in episodes.iter().zip(targets) {
-                                                let _ = fs::rename(&source, &target);
-
-                                                // Write the changes to the log if logging is enabled.
-                                                if program.log_changes {
-                                                    let mut log_path = ::std::env::home_dir()
-                                                        .try(b"unable to get home directory: ", &mut io::stderr());
-                                                    log_path.push("tv-renamer.log");
-                                                    let mut log = fs::OpenOptions::new().append(true).open(&log_path)
-                                                        .try(b"unable to open log: ", &mut io::stderr());
-                                                    let _ = log.write(common::shorten_path(&source).to_string_lossy().as_bytes());
-                                                    let _ = log.write(b" -> ");
-                                                    let _ = log.write(common::shorten_path(&target).to_string_lossy().as_bytes());
-                                                    let _ = log.write(b"\n");
-                                                    let _ = log.flush();
-                                                }
-
-                                                // Update the preview
-                                                let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                                let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                                preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
-                                            }
-                                        },
-                                        Err(err) => {
-                                            // Dialog of Error?
-                                            println!("{:?}", err);
-                                        }
-                                    };
-                                },
-                                Err(err) => {
-                                    // Dialog of Error?
-                                    println!("{:?}", err);
-                                }
-                            };
-                        }
-                    },
-                    Err(err) => {
-                        // Dialog of Error?
-                        println!("{:?}", err);
-                    }
-                }
-            } else {
-                match common::get_episodes(&program.directory) {
-                    Ok(episodes) => {
-                        match program.get_targets(&program.directory, &episodes, program.episode_count) {
-                            Ok(targets) => {
-                                // Append the current time to the log if logging is enabled.
-                                if program.log_changes {
-                                    let mut log_path = ::std::env::home_dir()
-                                        .try(b"unable to get home directory: ", &mut io::stderr());
-                                    log_path.push("tv-renamer.log");
-                                    let mut log = fs::OpenOptions::new().create(true).append(true).open(&log_path)
-                                        .try(b"unable to open log: ", &mut io::stderr());
-                                    let local_time = Local::now().to_rfc2822();
-                                    let _ = log.write(b"\n");
-                                    let _ = log.write_all(local_time.as_bytes());
-                                    let _ = log.write(b"\n");
-                                    let _ = log.flush();
-                                }
-
-                                // Clear the preview, rename the files and then update the preview
-                                preview_list.clear();
-                                for (source, target) in episodes.iter().zip(targets) {
-                                    let _ = fs::rename(&source, &target);
-
-                                    // Write the changes to the log if logging is enabled.
-                                    if program.log_changes {
-                                        let mut log_path = ::std::env::home_dir()
-                                            .try(b"unable to get home directory: ", &mut io::stderr());
-                                        log_path.push("tv-renamer.log");
-                                        let mut log = fs::OpenOptions::new().append(true).open(&log_path)
-                                            .try(b"unable to open log: ", &mut io::stderr());
-                                        let _ = log.write(common::shorten_path(&source).to_string_lossy().as_bytes());
-                                        let _ = log.write(b" -> ");
-                                        let _ = log.write(common::shorten_path(&target).to_string_lossy().as_bytes());
-                                        let _ = log.write(b"\n");
-                                        let _ = log.flush();
-                                    }
-
-                                    // Update the preview
-                                    let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                    let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
-                                    preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
-                                }
-                            },
-                            Err(err) => {
-                                // Dialog of Error?
-                                println!("{:?}", err);
-                            }
-                        };
-                    },
-                    Err(err) => {
-                        // Dialog of Error?
-                        println!("{:?}", err);
-                    }
+            if let Some(directory) = directory_entry.get_text() {
+                let mut program = &mut Arguments {
+                    automatic:     auto.get_active(),
+                    dry_run:       false,
+                    log_changes:   log_changes.get_active(),
+                    no_name:       no_name.get_active(),
+                    tvdb:          tvdb.get_active(),
+                    verbose:       false,
+                    directory:     directory,
+                    series_name:   series_entry.get_text().unwrap_or(String::new()),
+                    season_number: season_spin_button.get_value_as_int() as usize,
+                    episode_count: episode_spin_button.get_value_as_int() as usize,
+                    pad_length:    2,
                 };
+
+                if !program.directory.is_empty() { program.rename_series(&preview_list); }
             }
         });
     }
@@ -377,4 +311,203 @@ pub fn launch() {
 
     gtk::main();
 
+}
+
+impl Arguments {
+    fn update_preview(&mut self, preview_list: &ListStore) {
+        if self.automatic {
+            let series = PathBuf::from(&self.directory);
+            self.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+            match common::get_seasons(&self.directory) {
+                Ok(seasons) => {
+                    preview_list.clear();
+                    for season in seasons {
+                        match common::derive_season_number(&season) {
+                            Some(number) => self.season_number = number,
+                            None         => continue
+                        }
+                        match common::get_episodes(season.as_os_str().to_str().unwrap()) {
+                            Ok(episodes) => {
+                                match self.get_targets(season.as_os_str().to_str().unwrap(), &episodes, self.episode_count) {
+                                    Ok(targets) => {
+                                        for (source, target) in episodes.iter().zip(targets) {
+                                            let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                            let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                            preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
+                                        }
+                                    },
+                                    Err(err) => {
+                                        // Dialog of Error?
+                                        println!("{:?}", err);
+                                    }
+                                };
+                            },
+                            Err(err) => {
+                                // Dialog of Error?
+                                println!("{:?}", err);
+                            }
+                        };
+                    }
+                },
+                Err(err) => {
+                    // Dialog of Error?
+                    println!("{:?}", err);
+                }
+            }
+        } else {
+            match common::get_episodes(&self.directory) {
+                Ok(episodes) => {
+                    match self.get_targets(&self.directory, &episodes, self.episode_count) {
+                        Ok(targets) => {
+                            preview_list.clear();
+                            for (source, target) in episodes.iter().zip(targets) {
+                                let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
+                            }
+                        },
+                        Err(err) => {
+                            // Dialog of Error?
+                            println!("{:?}", err);
+                        }
+                    };
+                },
+                Err(err) => {
+                    // Dialog of Error?
+                    println!("{:?}", err);
+                }
+            };
+        }
+    }
+
+    fn rename_series(&mut self, preview_list: &ListStore) {
+        if self.automatic {
+            let series = PathBuf::from(&self.directory);
+            self.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+            match common::get_seasons(&self.directory) {
+                Ok(seasons) => {
+                    preview_list.clear();
+                    for season in seasons {
+                        match common::derive_season_number(&season) {
+                            Some(number) => self.season_number = number,
+                            None         => continue
+                        }
+                        match common::get_episodes(season.as_os_str().to_str().unwrap()) {
+                            Ok(episodes) => {
+                                match self.get_targets(season.as_os_str().to_str().unwrap(), &episodes, self.episode_count) {
+                                    Ok(targets) => {
+                                        // Append the current time to the log if logging is enabled.
+                                        if self.log_changes {
+                                            let mut log_path = ::std::env::home_dir()
+                                                .try(b"unable to get home directory: ", &mut io::stderr());
+                                            log_path.push("tv-renamer.log");
+                                            let mut log = fs::OpenOptions::new().create(true).append(true).open(&log_path)
+                                                .try(b"unable to open log: ", &mut io::stderr());
+                                            let local_time = Local::now().to_rfc2822();
+                                            let _ = log.write(b"\n");
+                                            let _ = log.write_all(local_time.as_bytes());
+                                            let _ = log.write(b"\n");
+                                            let _ = log.flush();
+                                        }
+
+                                        // Clear the preview and then update it
+                                        preview_list.clear();
+                                        for (source, target) in episodes.iter().zip(targets) {
+                                            let _ = fs::rename(&source, &target);
+
+                                            // Write the changes to the log if logging is enabled.
+                                            if self.log_changes {
+                                                let mut log_path = ::std::env::home_dir()
+                                                    .try(b"unable to get home directory: ", &mut io::stderr());
+                                                log_path.push("tv-renamer.log");
+                                                let mut log = fs::OpenOptions::new().append(true).open(&log_path)
+                                                    .try(b"unable to open log: ", &mut io::stderr());
+                                                let _ = log.write(common::shorten_path(&source).to_string_lossy().as_bytes());
+                                                let _ = log.write(b" -> ");
+                                                let _ = log.write(common::shorten_path(&target).to_string_lossy().as_bytes());
+                                                let _ = log.write(b"\n");
+                                                let _ = log.flush();
+                                            }
+
+                                            // Update the preview
+                                            let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                            let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                            preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
+                                        }
+                                    },
+                                    Err(err) => {
+                                        // Dialog of Error?
+                                        println!("{:?}", err);
+                                    }
+                                };
+                            },
+                            Err(err) => {
+                                // Dialog of Error?
+                                println!("{:?}", err);
+                            }
+                        };
+                    }
+                },
+                Err(err) => {
+                    // Dialog of Error?
+                    println!("{:?}", err);
+                }
+            }
+        } else {
+            match common::get_episodes(&self.directory) {
+                Ok(episodes) => {
+                    match self.get_targets(&self.directory, &episodes, self.episode_count) {
+                        Ok(targets) => {
+                            // Append the current time to the log if logging is enabled.
+                            if self.log_changes {
+                                let mut log_path = ::std::env::home_dir()
+                                    .try(b"unable to get home directory: ", &mut io::stderr());
+                                log_path.push("tv-renamer.log");
+                                let mut log = fs::OpenOptions::new().create(true).append(true).open(&log_path)
+                                    .try(b"unable to open log: ", &mut io::stderr());
+                                let local_time = Local::now().to_rfc2822();
+                                let _ = log.write(b"\n");
+                                let _ = log.write_all(local_time.as_bytes());
+                                let _ = log.write(b"\n");
+                                let _ = log.flush();
+                            }
+
+                            // Clear the preview, rename the files and then update the preview
+                            preview_list.clear();
+                            for (source, target) in episodes.iter().zip(targets) {
+                                let _ = fs::rename(&source, &target);
+
+                                // Write the changes to the log if logging is enabled.
+                                if self.log_changes {
+                                    let mut log_path = ::std::env::home_dir()
+                                        .try(b"unable to get home directory: ", &mut io::stderr());
+                                    log_path.push("tv-renamer.log");
+                                    let mut log = fs::OpenOptions::new().append(true).open(&log_path)
+                                        .try(b"unable to open log: ", &mut io::stderr());
+                                    let _ = log.write(common::shorten_path(&source).to_string_lossy().as_bytes());
+                                    let _ = log.write(b" -> ");
+                                    let _ = log.write(common::shorten_path(&target).to_string_lossy().as_bytes());
+                                    let _ = log.write(b"\n");
+                                    let _ = log.flush();
+                                }
+
+                                // Update the preview
+                                let source = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                let target = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+                                preview_list.insert_with_values(None, &[0, 1], &[&source, &target]);
+                            }
+                        },
+                        Err(err) => {
+                            // Dialog of Error?
+                            println!("{:?}", err);
+                        }
+                    };
+                },
+                Err(err) => {
+                    // Dialog of Error?
+                    println!("{:?}", err);
+                }
+            };
+        }
+    }
 }
