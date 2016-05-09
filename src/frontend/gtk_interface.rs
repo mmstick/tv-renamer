@@ -206,7 +206,9 @@ pub fn launch() {
 
             if dialog.run() == gtk::ResponseType::Ok as i32 {
                 if let Some(path) = dialog.get_filename() {
-                    directory_entry.set_text(path.to_str().unwrap());
+                    if let Some(text) = path.to_str() {
+                        directory_entry.set_text(text);
+                    }
                 }
             }
             dialog.destroy();
