@@ -1,4 +1,6 @@
 language: rust
+env:
+    - GTK=3.18
 addons:
   apt:
     packages:
@@ -11,5 +13,6 @@ script:
     - tar xf deps.txz
     - cd "$WD"
     - export PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
+    - export LD_LIBRARY_PATH="$HOME/local/lib/"
     # Build the application
     - cargo build --verbose --features "enable_gtk"
