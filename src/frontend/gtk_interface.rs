@@ -91,6 +91,49 @@ pub fn launch() {
     preview_tree.set_model(Some(&preview_list));
     preview_tree.set_headers_visible(true);
 
+    // A simple macro that is shared among all widgets that trigger the action to update the preview.
+    macro_rules! gtk_preview {
+        ($widget:ident) => {{
+            let $widget             = $widget.clone();
+            let auto                = automatic_check.clone();
+            let no_name             = no_name_check.clone();
+            let tvdb                = tvdb_check.clone();
+            let log_changes         = log_changes_check.clone();
+            let season_spin_button  = season_spin_button.clone();
+            let episode_spin_button = episode_spin_button.clone();
+            let series_entry        = series_name_entry.clone();
+            let directory_entry     = series_directory_entry.clone();
+            let preview_list        = preview_list.clone();
+            let info_bar            = info_bar.clone();
+            let notification_label  = notification_label.clone();
+            $widget.connect_clicked(move |_| {
+                if let Some(directory) = directory_entry.get_text() {
+                    let mut program = &mut Arguments {
+                        automatic:     auto.get_active(),
+                        dry_run:       true,
+                        log_changes:   log_changes.get_active(),
+                        no_name:       no_name.get_active(),
+                        tvdb:          tvdb.get_active(),
+                        verbose:       false,
+                        directory:     directory,
+                        series_name:   series_entry.get_text().unwrap_or_default(),
+                        season_number: season_spin_button.get_value_as_int() as usize,
+                        episode_count: episode_spin_button.get_value_as_int() as usize,
+                        pad_length:    2,
+                    };
+
+                    if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
+                }
+            });
+        }}
+    }
+
+    // All of the widgets that implement the update preview action
+    gtk_preview!(no_name_check);
+    gtk_preview!(automatic_check);
+    gtk_preview!(tvdb_check);
+    gtk_preview!(preview_button);
+
     { // Hide the Info Bar when the Info Bar is closed
         let info_bar = info_bar.clone();
         info_button.connect_clicked(move |_| {
@@ -98,104 +141,6 @@ pub fn launch() {
         });
     }
 
-    { // NOTE: Update the preview when the Automatic checkbutton is modified
-        let auto                = automatic_check.clone();
-        let no_name             = no_name_check.clone();
-        let tvdb                = tvdb_check.clone();
-        let log_changes         = log_changes_check.clone();
-        let season_spin_button  = season_spin_button.clone();
-        let episode_spin_button = episode_spin_button.clone();
-        let series_entry        = series_name_entry.clone();
-        let directory_entry     = series_directory_entry.clone();
-        let preview_list        = preview_list.clone();
-        let info_bar            = info_bar.clone();
-        let notification_label  = notification_label.clone();
-        automatic_check.connect_clicked(move |_| {
-            if let Some(directory) = directory_entry.get_text() {
-                let mut program = &mut Arguments {
-                    automatic:     auto.get_active(),
-                    dry_run:       false,
-                    log_changes:   log_changes.get_active(),
-                    no_name:       no_name.get_active(),
-                    tvdb:          tvdb.get_active(),
-                    verbose:       false,
-                    directory:     directory,
-                    series_name:   series_entry.get_text().unwrap_or_default(),
-                    season_number: season_spin_button.get_value_as_int() as usize,
-                    episode_count: episode_spin_button.get_value_as_int() as usize,
-                    pad_length:    2,
-                };
-
-                if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
-            }
-        });
-    }
-
-    { // NOTE: Update the preview when the TVDB checkbutton is modified
-        let auto                = automatic_check.clone();
-        let no_name             = no_name_check.clone();
-        let tvdb                = tvdb_check.clone();
-        let log_changes         = log_changes_check.clone();
-        let season_spin_button  = season_spin_button.clone();
-        let episode_spin_button = episode_spin_button.clone();
-        let series_entry        = series_name_entry.clone();
-        let directory_entry     = series_directory_entry.clone();
-        let preview_list        = preview_list.clone();
-        let info_bar            = info_bar.clone();
-        let notification_label  = notification_label.clone();
-        tvdb_check.connect_clicked(move |_| {
-            if let Some(directory) = directory_entry.get_text() {
-                let mut program = &mut Arguments {
-                    automatic:     auto.get_active(),
-                    dry_run:       false,
-                    log_changes:   log_changes.get_active(),
-                    no_name:       no_name.get_active(),
-                    tvdb:          tvdb.get_active(),
-                    verbose:       false,
-                    directory:     directory,
-                    series_name:   series_entry.get_text().unwrap_or_default(),
-                    season_number: season_spin_button.get_value_as_int() as usize,
-                    episode_count: episode_spin_button.get_value_as_int() as usize,
-                    pad_length:    2,
-                };
-
-                if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
-            }
-        });
-    }
-
-    { // NOTE: Update the preview when the "No Name In Series" checkbutton is modified
-        let auto                = automatic_check.clone();
-        let no_name             = no_name_check.clone();
-        let tvdb                = tvdb_check.clone();
-        let log_changes         = log_changes_check.clone();
-        let season_spin_button  = season_spin_button.clone();
-        let episode_spin_button = episode_spin_button.clone();
-        let series_entry        = series_name_entry.clone();
-        let directory_entry     = series_directory_entry.clone();
-        let preview_list        = preview_list.clone();
-        let info_bar            = info_bar.clone();
-        let notification_label  = notification_label.clone();
-        no_name_check.connect_clicked(move |_| {
-            if let Some(directory) = directory_entry.get_text() {
-                let mut program = &mut Arguments {
-                    automatic:     auto.get_active(),
-                    dry_run:       false,
-                    log_changes:   log_changes.get_active(),
-                    no_name:       no_name.get_active(),
-                    tvdb:          tvdb.get_active(),
-                    verbose:       false,
-                    directory:     directory,
-                    series_name:   series_entry.get_text().unwrap_or_default(),
-                    season_number: season_spin_button.get_value_as_int() as usize,
-                    episode_count: episode_spin_button.get_value_as_int() as usize,
-                    pad_length:    2,
-                };
-
-                if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
-            }
-        });
-    }
 
     { // NOTE: Programs the Choose Directory button with a File Chooser Dialog.
         let auto                = automatic_check.clone();
@@ -228,40 +173,6 @@ pub fn launch() {
             }
             dialog.destroy();
 
-            if let Some(directory) = directory_entry.get_text() {
-                let mut program = &mut Arguments {
-                    automatic:     auto.get_active(),
-                    dry_run:       false,
-                    log_changes:   log_changes.get_active(),
-                    no_name:       no_name.get_active(),
-                    tvdb:          tvdb.get_active(),
-                    verbose:       false,
-                    directory:     directory,
-                    series_name:   series_entry.get_text().unwrap_or_default(),
-                    season_number: season_spin_button.get_value_as_int() as usize,
-                    episode_count: episode_spin_button.get_value_as_int() as usize,
-                    pad_length:    2,
-                };
-
-                if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
-            }
-        });
-    }
-
-    { // NOTE: Controls what happens when the preview button is pressed
-        let button              = preview_button.clone();
-        let auto                = automatic_check.clone();
-        let no_name             = no_name_check.clone();
-        let tvdb                = tvdb_check.clone();
-        let log_changes         = log_changes_check.clone();
-        let season_spin_button  = season_spin_button.clone();
-        let episode_spin_button = episode_spin_button.clone();
-        let series_entry        = series_name_entry.clone();
-        let directory_entry     = series_directory_entry.clone();
-        let preview_list        = preview_list.clone();
-        let info_bar            = info_bar.clone();
-        let notification_label  = notification_label.clone();
-        button.connect_clicked(move |_| {
             if let Some(directory) = directory_entry.get_text() {
                 let mut program = &mut Arguments {
                     automatic:     auto.get_active(),
@@ -351,7 +262,7 @@ impl Arguments {
                             Some(number) => self.season_number = number,
                             None         => continue
                         }
-                        if let Some(error) = self.rename_episodes(season.as_os_str().to_str().unwrap(), preview_list, true) {
+                        if let Some(error) = self.rename_episodes(season.as_os_str().to_str().unwrap(), preview_list) {
                             info_bar.set_message_type(gtk::MessageType::Error);
                             notification_label.set_text(&error);
                             info_bar.show();
@@ -364,7 +275,7 @@ impl Arguments {
                     info_bar.show();
                 }
             }
-        } else if let Some(error) = self.rename_episodes(&self.directory, preview_list, true) {
+        } else if let Some(error) = self.rename_episodes(&self.directory, preview_list) {
             info_bar.set_message_type(gtk::MessageType::Error);
             notification_label.set_text(&error);
             info_bar.show();
@@ -383,7 +294,7 @@ impl Arguments {
                             Some(number) => self.season_number = number,
                             None         => continue
                         }
-                        if let Some(error) = self.rename_episodes(season.as_os_str().to_str().unwrap(), preview_list, false) {
+                        if let Some(error) = self.rename_episodes(season.as_os_str().to_str().unwrap(), preview_list) {
                             info_bar.set_message_type(gtk::MessageType::Error);
                             notification_label.set_text(&error);
                         } else {
@@ -397,7 +308,7 @@ impl Arguments {
                     notification_label.set_text(err);
                 }
             }
-        } else if let Some(error) = self.rename_episodes(&self.directory, preview_list, false) {
+        } else if let Some(error) = self.rename_episodes(&self.directory, preview_list) {
             info_bar.set_message_type(gtk::MessageType::Error);
             notification_label.set_text(&error);
         } else {
@@ -407,7 +318,7 @@ impl Arguments {
         info_bar.show();
     }
 
-    fn rename_episodes(&self, directory: &str, preview_list: &ListStore, dry_run: bool) -> Option<String> {
+    fn rename_episodes(&self, directory: &str, preview_list: &ListStore) -> Option<String> {
         match common::get_episodes(directory) {
             Ok(episodes) => {
                 match self.get_targets(directory, &episodes, self.episode_count) {
@@ -415,7 +326,7 @@ impl Arguments {
                         if self.log_changes { common::log_append_time(); }
                         let mut error_occurred = false;
                         for (source, target) in episodes.iter().zip(targets) {
-                            if !dry_run {
+                            if !self.dry_run {
                                 if fs::rename(&source, &target).is_err() { error_occurred = true; };
                                 if self.log_changes { common::log_append_change(source.as_path(), target.as_path()); }
                             }
