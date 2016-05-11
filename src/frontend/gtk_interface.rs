@@ -1,4 +1,5 @@
 use backend::common::{self, Arguments};
+use backend::traits::ToFilename;
 use gtk;
 use gdk::enums::key;
 use gtk::prelude::*;
@@ -266,7 +267,7 @@ impl Arguments {
         preview_list.clear();
         if self.automatic {
             let series = PathBuf::from(&self.directory);
-            self.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+            self.series_name = series.to_filename();
             match common::get_seasons(&self.directory) {
                 Ok(seasons) => {
                     for season in seasons {
@@ -298,7 +299,7 @@ impl Arguments {
         preview_list.clear();
         if self.automatic {
             let series = PathBuf::from(&self.directory);
-            self.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+            self.series_name = series.to_filename();
             match common::get_seasons(&self.directory) {
                 Ok(seasons) => {
                     for season in seasons {

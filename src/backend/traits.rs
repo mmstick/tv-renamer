@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::io::{self, Write};
 use std::iter;
+use std::path::Path;
 use std::process;
 
 /// A trait that adds the ability for numbers to find their digit count and to convert them to padded strings.
@@ -32,6 +33,17 @@ impl Digits for usize {
         } else {
             self.to_string()
         }
+    }
+}
+
+pub trait ToFilename {
+    // Returns the filename of the path as a String
+    fn to_filename(&self) -> String;
+}
+
+impl ToFilename for Path {
+    fn to_filename(&self) -> String {
+        self.components().last().unwrap().as_os_str().to_str().unwrap().to_string()
     }
 }
 

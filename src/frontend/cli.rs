@@ -1,6 +1,6 @@
 use backend::man;
 use backend::common::{self, Arguments};
-use backend::traits::{Try, TryAndIgnore};
+use backend::traits::{ToFilename, Try, TryAndIgnore};
 use std::env;
 use std::fs;
 use std::io::{self, Write};
@@ -186,7 +186,7 @@ pub fn launch() {
 
     if program.automatic {
         let series = PathBuf::from(&program.directory);
-        program.series_name = series.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
+        program.series_name = series.to_filename();
         let seasons = match common::get_seasons(&program.directory) {
             Ok(seasons) => seasons,
             Err(err) => panic!("{}", err)

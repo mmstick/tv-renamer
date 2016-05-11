@@ -196,7 +196,7 @@ pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
 
 /// Returns a handle to the log file if it could be opened.
 fn open_log() -> Result<fs::File, String> {
-    match ::std::env::home_dir() {
+    match env::home_dir() {
         Some(mut path) => {
             path.push("tv-renamer.log");
             match fs::OpenOptions::new().create(true).append(true).open(path) {
