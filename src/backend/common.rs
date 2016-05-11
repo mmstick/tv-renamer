@@ -1,8 +1,11 @@
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+
 use backend::traits::{Digits};
+use chrono::*;
 use tvdb;
 
 #[derive(Clone, Debug)]
@@ -69,7 +72,7 @@ impl Arguments {
             };
 
             // Get target destination for the current file.
-            let new_destination = self.get_destination(Path::new(directory), &file, current_index, &tvdb_title);
+            let new_destination = self.get_destination(Path::new(directory), file, current_index, &tvdb_title);
             output.push(new_destination);
             current_index += 1;
         }
@@ -79,7 +82,6 @@ impl Arguments {
     /// Obtain the target path of the file based on the episode count
     pub fn get_destination(&self, directory: &Path, file: &Path, episode: usize, title: &str) -> PathBuf {
         let mut destination = PathBuf::from(&directory);
-        let extension = file.extension().unwrap_or(&OsStr::new("")).to_str().unwrap_or("");
 
         // Do not write the series name if no-name is enabled
         let mut filename = if self.no_name {
@@ -101,8 +103,9 @@ impl Arguments {
             filename.push_str(title);
         }
 
+        let extension = file.extension().unwrap_or_else(|| OsStr::new(""));
         if !extension.is_empty() { filename.push('.'); }
-        filename.push_str(extension);
+        filename.push_str(extension.to_str().unwrap_or(""));
         destination.push(filename);
 
         destination
@@ -188,5 +191,42 @@ pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
         Ok(episodes)
     } else {
         Err("unable to read file")
+    }
+}
+
+/// Returns a handle to the log file if it could be opened.
+fn open_log() -> Result<fs::File, String> {
+    match ::std::env::home_dir() {
+        Some(mut path) => {
+            path.push("tv-renamer.log");
+            match fs::OpenOptions::new().create(true).append(true).open(path) {
+                Ok(log) => Ok(log),
+                Err(error) => Err(format!("unable to open log file: {:?}", error))
+            }
+        },
+        None => Err(String::from("unable to get home directory")),
+    }
+
+}
+
+/// Appends the current time to the log file.
+pub fn log_append_time() {
+    let local_time = Local::now().to_rfc2822();
+    if let Ok(mut log) = open_log() {
+        let _ = log.write(b"\n");
+        let _ = log.write_all(local_time.as_bytes());
+        let _ = log.write(b"\n");
+        let _ = log.flush();
+    }
+}
+
+// Log the file renaming modification to the log file.
+pub fn log_append_change(source: &Path, target: &Path) {
+    if let Ok(mut log) = open_log() {
+        let _ = log.write(shorten_path(source).to_string_lossy().as_bytes());
+        let _ = log.write(b" -> ");
+        let _ = log.write(shorten_path(target).to_string_lossy().as_bytes());
+        let _ = log.write(b"\n");
+        let _ = log.flush();
     }
 }
