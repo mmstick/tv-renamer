@@ -40,6 +40,7 @@ impl Default for Arguments {
             season_number: 1,
             episode_count: 1,
             pad_length:    2,
+            template:      common::default_template(),
         };
 
         // Create a peekable iterator so that we can see the value of some options.

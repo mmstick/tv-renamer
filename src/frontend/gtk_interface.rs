@@ -131,6 +131,7 @@ pub fn launch() {
                         season_number: season_spin_button.get_value_as_int() as usize,
                         episode_count: episode_spin_button.get_value_as_int() as usize,
                         pad_length:    2,
+                        template:      common::default_template()
                     };
 
                     if !program.directory.is_empty() {
@@ -199,6 +200,7 @@ pub fn launch() {
                     season_number: season_spin_button.get_value_as_int() as usize,
                     episode_count: episode_spin_button.get_value_as_int() as usize,
                     pad_length:    2,
+                    template:      common::default_template()
                 };
 
                 if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
@@ -233,6 +235,7 @@ pub fn launch() {
                     season_number: season_spin_button.get_value_as_int() as usize,
                     episode_count: episode_spin_button.get_value_as_int() as usize,
                     pad_length:    2,
+                    template:      common::default_template()
                 };
 
                 if !program.directory.is_empty() {

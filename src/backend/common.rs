@@ -9,6 +9,20 @@ use chrono::*;
 use tvdb;
 
 #[derive(Clone, Debug)]
+pub enum TemplateToken {
+    Character(char),
+    Series,
+    Season,
+    Episode,
+    Title,
+}
+
+pub fn default_template() -> Vec<TemplateToken> {
+    vec![TemplateToken::Series, TemplateToken::Character(' '), TemplateToken::Season, TemplateToken::Character('x'),
+        TemplateToken::Episode, TemplateToken::Character(' '), TemplateToken::Title ]
+}
+
+#[derive(Clone, Debug)]
 pub struct Arguments {
     // Automatically infer the name of a series and season number by the directory structure.
     pub automatic:     bool,
@@ -42,6 +56,9 @@ pub struct Arguments {
 
     // The number of zeros to use when padding episode numbers.
     pub pad_length:    usize,
+
+    // The template used for setting the naming scheme of episodes.
+    pub template:      Vec<TemplateToken>
 }
 
 impl Arguments {
@@ -81,34 +98,33 @@ impl Arguments {
 
     /// Obtain the target path of the file based on the episode count
     pub fn get_destination(&self, directory: &Path, file: &Path, episode: usize, title: &str) -> PathBuf {
-        let mut destination = PathBuf::from(&directory);
+        let mut destination = String::from(directory.to_str().unwrap());
+        destination.push('/');
 
-        // Do not write the series name if no-name is enabled
-        let mut filename = if self.no_name {
-            String::new()
-        } else {
-            let mut filename = self.series_name.clone();
-            filename.push(' ');
-            filename
-        };
+        let mut filename = String::new();
+        for pattern in self.template.clone() {
+            match pattern {
+                TemplateToken::Character(value) => filename.push(value),
+                TemplateToken::Series  => if !self.no_name { filename.push_str(self.series_name.clone().as_str()); },
+                TemplateToken::Season  => filename.push_str(self.season_number.to_string().as_str()),
+                TemplateToken::Episode => filename.push_str(episode.to_padded_string('0', self.pad_length).as_str()),
+                TemplateToken::Title   => if self.tvdb { filename.push_str(title); }
+            }
+        }
+        filename = String::from(filename.trim()); // Remove extra spaces
+        filename = filename.replace("/", "");     // Remove characters that are invalid in pathnames
 
-        // Append the season number, episode number and extension if available.
-        filename.push_str(&self.season_number.to_string());
-        filename.push('x');
-        filename.push_str(episode.to_padded_string('0', self.pad_length).as_str());
-
-        // Add the episode title to the filename if TVDB is enabled.
-        if self.tvdb {
-            filename.push(' ');
-            filename.push_str(title);
+        // Append the extension
+        let extension = file.extension().unwrap_or_else(|| OsStr::new("")).to_str().unwrap_or("");
+        if !extension.is_empty() {
+            filename.push('.');
+            filename.push_str(extension);
         }
 
-        let extension = file.extension().unwrap_or_else(|| OsStr::new("")).to_str().unwrap_or("");
-        if !extension.is_empty() { filename.push('.'); }
-        filename.push_str(extension);
-        destination.push(filename);
-
-        destination
+        // Return the path as a PathBuf
+        destination.push_str(&filename);
+        println!("{}", destination);
+        PathBuf::from(destination)
     }
 }
 
