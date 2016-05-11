@@ -103,9 +103,9 @@ impl Arguments {
             filename.push_str(title);
         }
 
-        let extension = file.extension().unwrap_or_else(|| OsStr::new(""));
+        let extension = file.extension().unwrap_or_else(|| OsStr::new("")).to_str().unwrap_or("");
         if !extension.is_empty() { filename.push('.'); }
-        filename.push_str(extension.to_str().unwrap_or(""));
+        filename.push_str(extension);
         destination.push(filename);
 
         destination
