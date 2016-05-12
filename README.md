@@ -8,15 +8,13 @@ With Rust installed, simply execute `cargo install --git https://github.com/mmst
 
 ![GTK3 Screenshot](screenshot-gtk3.png)
 
-The use of this application should be fairly straightforward. Make sure that the only files located in directories to be renamed are files that you want to be renamed as episodes in the series, and ensure that all of the episodes are in alphabetical order. The application does not derive the episode number from the episode name, but by their alphabetical order in the directory.
+The use of this application should be fairly straightforward. However, ensure that the only files located in directories to be renamed are files that you want to be renamed as episodes in the series, and ensure that all of the episodes are in alphabetical order. The application does not derive the episode number from the episode name, but by their alphabetical order in the directory.
 
-**Season Name** is where you will place the name of the series that you are renaming, **Season Directory** is the directory where the series is located, **Season Number** is the season number that you have chosen to rename, and **Episode Number** is the episode index by which the renaming application will start counting up from.
-
-The top left `gtk::ListBox` contains `gtk::CheckButton`s for each of the important parameters found in the CLI application. The **Automatic** check button only requires that you fill out the information for the **Season Directory** and **Episode Count** inputs, and will automatically infer the name of the series and season number from the directory structure. Only directories that contain "season" or "special" in the name will be considered by the application, so you are free to have other directories.
+**Season Name** is where you will place the name of the series that you are renaming, which can be ignored if you have toggled **Automatic**. **Season Directory** is the base directory of the series if you are using **Automatic**, or the season directory where your episodes are stored. **Template** is where you will define your naming scheme, which by default is set to name files like so: "Season Name 1x01 Episode Title.mkv". **Season Number** and **Episode Number** are only used when **Automatic** is disabled, and it will define where to start counting from. **Log Changes** will simply log changes that have been performed on the disk.
 
 The directory structure for **Automatic** should be as follows:
 
-- Series directory
+- Series directory <- directory to point to
 
   - Specials OR Season 0
 
@@ -29,8 +27,6 @@ The directory structure for **Automatic** should be as follows:
   - Season 2
 
     - Episodes...
-
-The **TVDB Titles** option should be a favorite option for many, as it will also search TVDB for the titles of each episode and append the title in the filenames. **No Series Name** can also be used, which will not prepend the name of the series to each episode. **Log Changes** will simply log changes that have been performed on the disk.
 
 # CLI Manual
 
@@ -58,11 +54,9 @@ If no DIRECTORY is given, the default path will be the current working directory
 
 **-n, --series-name:** Sets the name of the series to be renamed. [not optional]
 
-**--no-name:** Disables writing the name of the series when renaming.
-
 **-s, --season-number:** Sets the season number to use when renaming a file. [default: 1]
 
-**-t, --tvdb:** Append the episode title from TVDB to each episode.
+**-t, --template:** Sets the template that will define the naming scheme. [default: "${Series} ${Season}x${Episode} ${TVDB_Title}"]
 
 **-e, --episode-start:** Sets the episode number to start counting from. [default: 1]
 
@@ -76,18 +70,18 @@ When executed inside of a directory with the name of the TV Series
 
 ```
 one.mkv two.mkv three.mkv
-> tv-renamer -n "$series"
-"TV Series 1x01.mkv"
-"TV Series 1x02.mkv"
-"TV Series 1x03.mkv"
+> tv-renamer -n "series name"
+"TV Series 1x01 Episode Title.mkv"
+"TV Series 1x02 Episode Title.mkv"
+"TV Series 1x03 Episode Title.mkv"
 ```
 
-If you do not want to have the series name added to the episodes:
+You can define your own naming scheme with --template:
 
 ```
 > one.mkv two.mkv three.mkv
-> tv-renamer --no-name
-> "1x01.mkv" "1x02.mkv" "1x03.mkv
+> tv-renamer -t "${Series} S${Season}E${Episode} - ${TVDB_Title}"
+> "TV Series S1E01 - Episode Title.mkv" "TV Series S1E02 - Episode Title.mkv" "TV Series S1E03 - Episode Title.mkv"
 ```
 
 The season name can also be automatically inferred:
@@ -104,7 +98,7 @@ The season name can also be automatically inferred:
 Episode titles can also be pulled from the TVDB and added to the filenames.
 
 ```
-> tv-renamer -a -t
+> tv-renamer -a -t "${Series} ${Season}x${Episode} ${TVDB_Title}"
 "TV Series/Season1/TV Series 1x01 Episode Title.mkv"
 ```
 

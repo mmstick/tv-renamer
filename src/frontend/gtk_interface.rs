@@ -1,10 +1,9 @@
-use backend::common::{self, Arguments};
+use backend::{self, Arguments, logging, tokenizer};
 use backend::traits::ToFilename;
-use gtk;
 use gdk::enums::key;
 use gtk::prelude::*;
 use gtk::{
-    Builder, Button, CheckButton, Entry, FileChooserDialog, ListBox, ListBoxRow, ListStore,
+    self, Builder, Button, CheckButton, Entry, FileChooserDialog, ListBox, ListBoxRow, ListStore,
     SpinButton, TreeView, TreeViewColumn, Type, Window, WindowType
 };
 use std::fs;
@@ -38,6 +37,7 @@ pub fn launch() {
     let input_list: ListBox             = builder.get_object("input_list").unwrap();
     let series_name_entry: Entry        = builder.get_object("series_name_entry").unwrap();
     let series_directory_entry: Entry   = builder.get_object("series_directory_entry").unwrap();
+    let template_entry: Entry           = builder.get_object("template_entry").unwrap();
     let series_directory_button: Button = builder.get_object("series_directory_button").unwrap();
     let episode_spin_button: SpinButton = builder.get_object("episode_spin_button").unwrap();
     let season_spin_button: SpinButton  = builder.get_object("season_spin_button").unwrap();
@@ -49,29 +49,19 @@ pub fn launch() {
     // Create rows for the input_list
     let automatic_row   = ListBoxRow::new();
     let log_changes_row = ListBoxRow::new();
-    let series_name_row = ListBoxRow::new();
-    let tvdb_row        = ListBoxRow::new();
     automatic_row.set_selectable(false);
     log_changes_row.set_selectable(false);
-    series_name_row.set_selectable(false);
-    tvdb_row.set_selectable(false);
 
     // Create check boxes for the rows
     let automatic_check   = CheckButton::new_with_label("Automatic");
-    let no_name_check     = CheckButton::new_with_label("No Series Name");
-    let tvdb_check        = CheckButton::new_with_label("TVDB Titles");
-    let log_changes_check = CheckButton::new_with_label("Log Changes");
+    let log_changes_check = CheckButton::new_with_label("Logging");
 
     // Add the check boxes to the rows
     automatic_row.add(&automatic_check);
-    series_name_row.add(&no_name_check);
-    tvdb_row.add(&tvdb_check);
     log_changes_row.add(&log_changes_check);
 
     // Add the rows to the list box
     input_list.insert(&automatic_row, -1);
-    input_list.insert(&series_name_row, -1);
-    input_list.insert(&tvdb_row, -1);
     input_list.insert(&log_changes_row, -1);
 
     // TreeView's List Store
@@ -107,8 +97,6 @@ pub fn launch() {
         ($widget:ident) => {{
             let $widget             = $widget.clone();
             let auto                = automatic_check.clone();
-            let no_name             = no_name_check.clone();
-            let tvdb                = tvdb_check.clone();
             let log_changes         = log_changes_check.clone();
             let season_spin_button  = season_spin_button.clone();
             let episode_spin_button = episode_spin_button.clone();
@@ -117,21 +105,20 @@ pub fn launch() {
             let preview_list        = preview_list.clone();
             let info_bar            = info_bar.clone();
             let notification_label  = notification_label.clone();
+            let template_entry      = template_entry.clone();
             $widget.connect_clicked(move |_| {
                 if let Some(directory) = directory_entry.get_text() {
                     let mut program = &mut Arguments {
                         automatic:     auto.get_active(),
                         dry_run:       true,
                         log_changes:   log_changes.get_active(),
-                        no_name:       no_name.get_active(),
-                        tvdb:          tvdb.get_active(),
                         verbose:       false,
                         directory:     parse_directory(&directory),
                         series_name:   series_entry.get_text().unwrap_or_default(),
                         season_number: season_spin_button.get_value_as_int() as usize,
                         episode_count: episode_spin_button.get_value_as_int() as usize,
                         pad_length:    2,
-                        template:      common::default_template()
+                        template:      tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
                     };
 
                     if !program.directory.is_empty() {
@@ -143,9 +130,7 @@ pub fn launch() {
     }
 
     // All of the widgets that implement the update preview action
-    gtk_preview!(no_name_check);
     gtk_preview!(automatic_check);
-    gtk_preview!(tvdb_check);
     gtk_preview!(preview_button);
 
     { // Hide the Info Bar when the Info Bar is closed
@@ -158,8 +143,6 @@ pub fn launch() {
 
     { // NOTE: Programs the Choose Directory button with a File Chooser Dialog.
         let auto                = automatic_check.clone();
-        let no_name             = no_name_check.clone();
-        let tvdb                = tvdb_check.clone();
         let log_changes         = log_changes_check.clone();
         let season_spin_button  = season_spin_button.clone();
         let episode_spin_button = episode_spin_button.clone();
@@ -168,6 +151,7 @@ pub fn launch() {
         let preview_list        = preview_list.clone();
         let info_bar            = info_bar.clone();
         let notification_label  = notification_label.clone();
+        let template_entry      = template_entry.clone();
         series_directory_button.connect_clicked(move |_| {
             // Open file chooser dialog to modify series_directory_entry.
             let dialog = FileChooserDialog::new (
@@ -192,18 +176,18 @@ pub fn launch() {
                     automatic:     auto.get_active(),
                     dry_run:       true,
                     log_changes:   log_changes.get_active(),
-                    no_name:       no_name.get_active(),
-                    tvdb:          tvdb.get_active(),
                     verbose:       false,
                     directory:     parse_directory(&directory),
                     series_name:   series_entry.get_text().unwrap_or_default(),
                     season_number: season_spin_button.get_value_as_int() as usize,
                     episode_count: episode_spin_button.get_value_as_int() as usize,
                     pad_length:    2,
-                    template:      common::default_template()
+                    template:      tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
                 };
 
-                if !program.directory.is_empty() { program.update_preview(&preview_list, &info_bar, &notification_label); }
+                if !program.directory.is_empty() {
+                    program.update_preview(&preview_list, &info_bar, &notification_label);
+                }
             }
         });
     }
@@ -211,8 +195,6 @@ pub fn launch() {
     { // NOTE: Controls what happens when rename button is pressed
         let button              = rename_button.clone();
         let auto                = automatic_check.clone();
-        let no_name             = no_name_check.clone();
-        let tvdb                = tvdb_check.clone();
         let log_changes         = log_changes_check.clone();
         let season_spin_button  = season_spin_button.clone();
         let episode_spin_button = episode_spin_button.clone();
@@ -221,21 +203,20 @@ pub fn launch() {
         let preview_list        = preview_list.clone();
         let info_bar            = info_bar.clone();
         let notification_label  = notification_label.clone();
+        let template_entry      = template_entry.clone();
         button.connect_clicked(move |_| {
             if let Some(directory) = directory_entry.get_text() {
                 let mut program = &mut Arguments {
                     automatic:     auto.get_active(),
                     dry_run:       false,
                     log_changes:   log_changes.get_active(),
-                    no_name:       no_name.get_active(),
-                    tvdb:          tvdb.get_active(),
                     verbose:       false,
                     directory:     parse_directory(&directory),
                     series_name:   series_entry.get_text().unwrap_or_default(),
                     season_number: season_spin_button.get_value_as_int() as usize,
                     episode_count: episode_spin_button.get_value_as_int() as usize,
                     pad_length:    2,
-                    template:      common::default_template()
+                    template:      tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
                 };
 
                 if !program.directory.is_empty() {
@@ -265,16 +246,28 @@ pub fn launch() {
 
 }
 
-impl Arguments {
+trait GTK3 {
+    /// Update the GTK3 preview
+    fn update_preview(&mut self, preview_list: &ListStore, info_bar: &gtk::InfoBar, notification_label: &gtk::Label);
+
+    /// Grabs a list of seasons from a given directory and attempts to rename all of the episodes in each season.
+    /// The GTK3 InfoBar will be updated to reflect the changes that did or did not happen.
+    fn rename_series(&mut self, preview_list: &ListStore, info_bar: &gtk::InfoBar, notification_label: &gtk::Label);
+
+    /// Attempts to rename all of the episodes in a given directory, and then updates the GTK3 preview.
+    fn rename_episodes(&self, directory: &str, preview_list: &ListStore) -> Option<String>;
+}
+
+impl GTK3 for Arguments {
     fn update_preview(&mut self, preview_list: &ListStore, info_bar: &gtk::InfoBar, notification_label: &gtk::Label) {
         preview_list.clear();
         if self.automatic {
             let series = PathBuf::from(&self.directory);
             self.series_name = series.to_filename();
-            match common::get_seasons(&self.directory) {
+            match backend::get_seasons(&self.directory) {
                 Ok(seasons) => {
                     for season in seasons {
-                        match common::derive_season_number(&season) {
+                        match backend::derive_season_number(&season) {
                             Some(number) => self.season_number = number,
                             None         => continue
                         }
@@ -303,10 +296,10 @@ impl Arguments {
         if self.automatic {
             let series = PathBuf::from(&self.directory);
             self.series_name = series.to_filename();
-            match common::get_seasons(&self.directory) {
+            match backend::get_seasons(&self.directory) {
                 Ok(seasons) => {
                     for season in seasons {
-                        match common::derive_season_number(&season) {
+                        match backend::derive_season_number(&season) {
                             Some(number) => self.season_number = number,
                             None         => continue
                         }
@@ -335,16 +328,16 @@ impl Arguments {
     }
 
     fn rename_episodes(&self, directory: &str, preview_list: &ListStore) -> Option<String> {
-        match common::get_episodes(directory) {
+        match backend::get_episodes(directory) {
             Ok(episodes) => {
                 match self.get_targets(directory, &episodes, self.episode_count) {
                     Ok(targets) => {
-                        if self.log_changes { common::log_append_time(); }
+                        if self.log_changes { logging::append_time(); }
                         let mut error_occurred = false;
                         for (source, target) in episodes.iter().zip(targets) {
                             if !self.dry_run {
                                 if fs::rename(&source, &target).is_err() { error_occurred = true; };
-                                if self.log_changes { common::log_append_change(source.as_path(), target.as_path()); }
+                                if self.log_changes { logging::append_change(source.as_path(), target.as_path()); }
                             }
 
                             // Update the preview

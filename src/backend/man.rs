@@ -1,15 +1,13 @@
-pub const MAN_PAGE: &'static str = r#"
-NAME:
+pub const MAN_PAGE: &'static str = r#"NAME:
     tv-renamer - rename TV series and movies
 
 SYNOPSIS:
     tv-renamer DIRECTORY [-a | --automatic]
                            [-d | --dry-run]
-                           [--no-name]
                            [-l | --log-changes]
                            [-n | --series-name "NAME OF SERIES"]
                            [-s | --season-number NUMBER]
-                           [-t | --tvdb]
+                           [-t | --template "TEMPLATE"]
                            [-p | --pad-length NUMBER]
                            [-e | --episode-start NUMBER]
 
@@ -37,14 +35,12 @@ OPTIONS:
     -n, --series-name:
         Sets the name of the series to be renamed. [not optional]
 
-    --no-name:
-        Disables writing the name of the series when renaming.
-
     -s, --season-number:
         Sets the season number to use when renaming a file. [default: 1]
 
-    -t, --tvdb:
-        Append the episode title from TVDB to each episode.
+    -t, --template:
+        Sets the template that will define the naming scheme.
+        [default: "${Series} ${Season}x${Episode} ${TVDB_Title}"]
 
     -e, --episode-start:
         Sets the episode number to start counting from. [default: 1]
@@ -59,12 +55,12 @@ EXAMPLE:
     When executed inside of a directory with the name of the TV Series
         > one.mkv two.mkv three.mkv
         > tv-renamer -n "Name of Season"
-        > "TV Series 1x01.mkv" "TV Series 1x02.mkv" "TV Series 1x03.mkv"
+        > "TV Series 1x01 Episode Title.mkv" "TV Series 1x02 Episode Title.mkv" "TV Series 1x03 Episode Title.mkv"
 
-    If you do not want to have the series name added to the episodes:
+    You can define your own naming scheme with --template:
         > one.mkv two.mkv three.mkv
-        > tv-renamer --no-name
-        > "1x01.mkv" "1x02.mkv" "1x03.mkv
+        > tv-renamer -t "${Series} S${Season}E${Episode} - ${TVDB_Title}"
+        > "TV Series S1E01 - Episode Title.mkv" "TV Series S1E02 - Episode Title.mkv" "TV Series S1E03 - Episode Title.mkv"
 
     The season name can also be automatically inferred:
         > "TV Series/Season1"

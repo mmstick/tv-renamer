@@ -1,6 +1,6 @@
 [package]
 name = "tv-renamer"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Michael Aaron Murphy <mmstickman@gmail.com>"]
 description = "A TV series renaming application that supports adding titles to episodes using TVDB and sports a CLI and optional GTK3 interface"
 repository = "https://github.com/mmstick/tv-renamer"

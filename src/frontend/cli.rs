@@ -1,12 +1,14 @@
-use backend::man;
-use backend::common::{self, Arguments};
-use backend::traits::{ToFilename, Try, TryAndIgnore};
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process;
+
 use tvdb;
+use backend::man::MAN_PAGE;
+use backend::{self, Arguments, logging};
+use backend::tokenizer::{self, TemplateToken};
+use backend::traits::{ToFilename, Try, TryAndIgnore};
 
 const EP_NO_VAL:     &'static [u8] = b"no value was set for the episode count.";
 const EP_NAN:        &'static [u8] = b"no value was set for the episode count.";
@@ -15,6 +17,7 @@ const SN_NO_VAL:     &'static [u8] = b"no value was set for the season number.";
 const SN_NAN:        &'static [u8] = b"value set for season number is not a number.";
 const PD_NO_VAL:     &'static [u8] = b"no value was set for the pad length.";
 const PD_NAN:        &'static [u8] = b"value set for pad length is not a number.";
+const TMP_NO_VAL:    &'static [u8] = b"no value was set for the template.";
 const INVALID_CWD:   &'static [u8] = b"unable to get the current working directory.";
 const INVALID_ARG:   &'static [u8] = b"invalid argument was given.";
 const TOO_MANY_ARGS: &'static [u8] = b"too many extra arguments given to the program.";
@@ -32,15 +35,13 @@ impl Default for Arguments {
             automatic:     false,
             dry_run:       false,
             log_changes:   false,
-            no_name:       false,
-            tvdb:          false,
             verbose:       false,
             directory:     String::new(),
             series_name:   String::new(),
             season_number: 1,
             episode_count: 1,
             pad_length:    2,
-            template:      common::default_template(),
+            template:      tokenizer::default_template(),
         };
 
         // Create a peekable iterator so that we can see the value of some options.
@@ -55,7 +56,7 @@ impl Default for Arguments {
                 match argument.as_str() {
                     "-a" | "--automatic" => program.automatic = true,
                     "-h" | "--help" => {
-                        let _ = stdout.write(man::MAN_PAGE.as_bytes());
+                        let _ = stdout.write(MAN_PAGE.as_bytes());
                         let _ = stdout.flush();
                         process::exit(0);
                     }
@@ -70,13 +71,15 @@ impl Default for Arguments {
                         program.series_name.push_str(iterator.peek().try(SR_NO_VAL, stderr));
                         ignore = true;
                     },
-                    "--no-name" => program.no_name = true,
                     "-s" | "--season-number" => {
                         program.season_number = iterator.peek().try(SN_NO_VAL, stderr).parse::<usize>()
                             .try_and_ignore(SN_NAN, stderr);
                         ignore = true;
                     },
-                    "-t" | "--tvdb" => program.tvdb = true,
+                    "-t" | "--template" => {
+                        program.template = tokenizer::tokenize_template(iterator.peek().try(TMP_NO_VAL, stderr).as_str());
+                        ignore = true;
+                    },
                     "-p" | "--pad-length" => program.pad_length = iterator.peek().try(PD_NO_VAL, stderr)
                         .parse::<usize>().try_and_ignore(PD_NAN, stderr),
                     "-v" | "--verbose" => program.verbose = true,
@@ -85,6 +88,7 @@ impl Default for Arguments {
             } else if program.directory.is_empty() {
                 program.directory = argument;
             } else {
+                println!("{}", argument);
                 abort_with_message(stderr, TOO_MANY_ARGS)
             }
         }
@@ -95,12 +99,15 @@ impl Default for Arguments {
         }
 
         // If no series name was given, ask for the name.
-        if program.series_name.is_empty() && !program.no_name && !program.automatic {
+        if program.series_name.is_empty() && !program.automatic {
             stdout.write(b"Please enter the name of the series: ").try(STDOUT_ERROR, stderr);
             stdout.flush().try(STDOUT_ERROR, stderr);
             io::stdin().read_line(&mut program.series_name).try(b"unable to read from stdin: ", stderr);
             program.series_name.pop().unwrap();
         }
+
+        // If no template was defined, set set the default template.
+        if program.template.is_empty() { tokenizer::default_template(); }
 
         program
     }
@@ -111,7 +118,7 @@ impl Arguments {
     fn rename_episodes_cli(&self, directory: &Path, stderr: &mut io::Stderr, stdout: &mut io::Stdout) {
         // If TVDB is enabled, create the API and search for the series information.
         let api = tvdb::Tvdb::new("0629B785CE550C8D");
-        let series_info = if self.tvdb {
+        let series_info = if self.template.contains(&TemplateToken::TVDB) {
             match api.search(self.series_name.as_str(), "en") {
                 Ok(reply) => Some(reply),
                 Err(_) => {
@@ -125,7 +132,7 @@ impl Arguments {
         };
 
         // Get a list of episodes
-        let episodes = match common::get_episodes(directory.to_str().unwrap()) {
+        let episodes = match backend::get_episodes(directory.to_str().unwrap()) {
             Ok(episodes) => episodes,
             Err(err) => panic!("{}", err)
         };
@@ -133,7 +140,7 @@ impl Arguments {
         let mut current_episode = self.episode_count;
         for source in episodes {
             // If TVDB is enabled, get the episode title from the series information, else return an empty string.
-            let title = if self.tvdb {
+            let title = if self.template.contains(&TemplateToken::TVDB) {
                 let reply = series_info.clone().unwrap();
                 match api.episode(&reply[0], self.season_number as u32, current_episode as u32) {
                     Ok(episode) => episode.episode_name,
@@ -163,15 +170,15 @@ impl Arguments {
             // If verbose or dry-run is enabled, print the change that occurred.
             if self.verbose | self.dry_run {
                 stdout.write(b"\x1b[1m\x1b[32m").try(b"error writing to stdout: ", stderr);
-                stdout.write(common::shorten_path(&source).to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
+                stdout.write(backend::shorten_path(&source).to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
                 stdout.write(b"\x1b[0m ->  \x1b[1m\x1b[32m").try(STDOUT_ERROR, stderr);
-                stdout.write(common::shorten_path(&target).to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
+                stdout.write(backend::shorten_path(&target).to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
                 stdout.write(b"\x1b[0m\n").try(STDOUT_ERROR, stderr);
                 stdout.flush().try(STDOUT_ERROR, stderr);
             }
 
             // Write the changes to the log if logging is enabled.
-            if self.log_changes { common::log_append_change(source.as_path(), target.as_path()); }
+            if self.log_changes { logging::append_change(source.as_path(), target.as_path()); }
 
             current_episode += 1;
         }
@@ -183,17 +190,17 @@ pub fn launch() {
     let stdout = &mut io::stdout();
     let program = &mut Arguments::default();
 
-    if program.log_changes { common::log_append_time(); }
+    if program.log_changes { logging::append_time(); }
 
     if program.automatic {
         let series = PathBuf::from(&program.directory);
         program.series_name = series.to_filename();
-        let seasons = match common::get_seasons(&program.directory) {
+        let seasons = match backend::get_seasons(&program.directory) {
             Ok(seasons) => seasons,
             Err(err) => panic!("{}", err)
         };
         for season in seasons {
-            if let Some(number) = common::derive_season_number(&season) {
+            if let Some(number) = backend::derive_season_number(&season) {
                 program.season_number = number;
                 program.rename_episodes_cli(&season, stderr, stdout);
             }

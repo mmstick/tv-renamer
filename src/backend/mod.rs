@@ -1,26 +1,17 @@
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use backend::traits::{Digits};
-use chrono::*;
+pub mod logging;
+pub mod man;
+pub mod traits;
+pub mod tokenizer;
+
+use self::traits::Digits;
+use self::tokenizer::TemplateToken;
+
 use tvdb;
-
-#[derive(Clone, Debug)]
-pub enum TemplateToken {
-    Character(char),
-    Series,
-    Season,
-    Episode,
-    Title,
-}
-
-pub fn default_template() -> Vec<TemplateToken> {
-    vec![TemplateToken::Series, TemplateToken::Character(' '), TemplateToken::Season, TemplateToken::Character('x'),
-        TemplateToken::Episode, TemplateToken::Character(' '), TemplateToken::Title ]
-}
 
 #[derive(Clone, Debug)]
 pub struct Arguments {
@@ -32,12 +23,6 @@ pub struct Arguments {
 
     // Log the changes that were made to the disk.
     pub log_changes:   bool,
-
-    // Do not write the name of the series in each episode's file name.
-    pub no_name:       bool,
-
-    // Find the episode title of each episode from TVDB and place it in the file names.
-    pub tvdb:          bool,
 
     // Print all changes that are being attempted and performed.
     pub verbose:       bool,
@@ -65,7 +50,7 @@ impl Arguments {
     /// Given a source of episodes from a directory, this returns a list of their target paths.
     pub fn get_targets(&self, directory: &str, episodes: &[PathBuf], episode_index: usize) -> Result<Vec<PathBuf>, String> {
         let api = tvdb::Tvdb::new("0629B785CE550C8D");
-        let series_info = if self.tvdb {
+        let series_info = if self.template.contains(&TemplateToken::TVDB) {
             match api.search(self.series_name.as_str(), "en") {
                 Ok(reply) => Some(reply),
                 Err(_) => { return Err(String::from("unable to get TVDB series information")); }
@@ -78,11 +63,11 @@ impl Arguments {
         let mut current_index = episode_index;
         for file in episodes {
             // TVDB Titles
-            let tvdb_title = if self.tvdb {
+            let tvdb_title = if self.template.contains(&TemplateToken::TVDB) {
                 let reply = series_info.clone().unwrap();
                 match api.episode(&reply[0], self.season_number as u32, current_index as u32) {
                     Ok(episode) => episode.episode_name,
-                    Err(_) => { return Err(format!("media-rename: episode '{}' does not exist", file.to_string_lossy())); }
+                    Err(_) => { return Err(format!("episode '{}' does not exist", file.to_string_lossy())); }
                 }
             } else {
                 String::new()
@@ -105,14 +90,14 @@ impl Arguments {
         for pattern in self.template.clone() {
             match pattern {
                 TemplateToken::Character(value) => filename.push(value),
-                TemplateToken::Series  => if !self.no_name { filename.push_str(self.series_name.clone().as_str()); },
+                TemplateToken::Series  => filename.push_str(self.series_name.clone().as_str()),
                 TemplateToken::Season  => filename.push_str(self.season_number.to_string().as_str()),
                 TemplateToken::Episode => filename.push_str(episode.to_padded_string('0', self.pad_length).as_str()),
-                TemplateToken::Title   => if self.tvdb { filename.push_str(title); }
+                TemplateToken::TVDB    => filename.push_str(title),
             }
         }
         filename = String::from(filename.trim()); // Remove extra spaces
-        filename = filename.replace("/", "");     // Remove characters that are invalid in pathnames
+        filename = filename.replace("/", "-");     // Remove characters that are invalid in pathnames
 
         // Append the extension
         let extension = file.extension().unwrap_or_else(|| OsStr::new("")).to_str().unwrap_or("");
@@ -123,27 +108,25 @@ impl Arguments {
 
         // Return the path as a PathBuf
         destination.push_str(&filename);
-        println!("{}", destination);
         PathBuf::from(destination)
     }
 }
 
 /// Takes a pathname and shortens it for readability.
 pub fn shorten_path(path: &Path) -> PathBuf {
-    match path.strip_prefix(&env::current_dir().unwrap()) {
-        Ok(value) => {
-            let mut path = PathBuf::from(".");
-            path.push(value);
-            path
-        },
-        Err(_) => match path.strip_prefix(&env::home_dir().unwrap()) {
+    if let Ok(value) = path.strip_prefix(&env::current_dir().unwrap()) {
+        let mut path = PathBuf::from(".");
+        path.push(value);
+        path
+    } else {
+        match path.strip_prefix(&env::home_dir().unwrap()) {
             Ok(value) => {
                 let mut path = PathBuf::from("~");
                 path.push(value);
                 path
             },
             Err(_) => path.to_path_buf()
-        },
+        }
     }
 }
 
@@ -210,39 +193,11 @@ pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
     }
 }
 
-/// Returns a handle to the log file if it could be opened.
-fn open_log() -> Result<fs::File, String> {
-    match env::home_dir() {
-        Some(mut path) => {
-            path.push("tv-renamer.log");
-            match fs::OpenOptions::new().create(true).append(true).open(path) {
-                Ok(log) => Ok(log),
-                Err(error) => Err(format!("unable to open log file: {:?}", error))
-            }
-        },
-        None => Err(String::from("unable to get home directory")),
-    }
-
-}
-
-/// Appends the current time to the log file.
-pub fn log_append_time() {
-    let local_time = Local::now().to_rfc2822();
-    if let Ok(mut log) = open_log() {
-        let _ = log.write(b"\n");
-        let _ = log.write_all(local_time.as_bytes());
-        let _ = log.write(b"\n");
-        let _ = log.flush();
-    }
-}
-
-// Log the file renaming modification to the log file.
-pub fn log_append_change(source: &Path, target: &Path) {
-    if let Ok(mut log) = open_log() {
-        let _ = log.write(shorten_path(source).to_string_lossy().as_bytes());
-        let _ = log.write(b" -> ");
-        let _ = log.write(shorten_path(target).to_string_lossy().as_bytes());
-        let _ = log.write(b"\n");
-        let _ = log.flush();
-    }
+#[test]
+fn test_derive_season_number() {
+    assert_eq!(derive_season_number(&Path::new("Specials")), Some(0));
+    assert_eq!(derive_season_number(&Path::new("Season 0")), Some(0));
+    assert_eq!(derive_season_number(&Path::new("Season 1")), Some(1));
+    assert_eq!(derive_season_number(&Path::new("season9")), Some(9));
+    assert_eq!(derive_season_number(&Path::new("Extras")), None);
 }

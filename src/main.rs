@@ -3,11 +3,13 @@ extern crate tvdb;
 #[cfg(feature = "enable_gtk")] extern crate gtk;
 #[cfg(feature = "enable_gtk")] extern crate gdk;
 
-pub mod backend {
-    pub mod common;
-    pub mod man;
-    pub mod traits;
-}
+// pub mod backend {
+//     pub mod common;
+//     pub mod man;
+//     pub mod traits;
+//     pub mod tokenizer;
+// }
+pub mod backend;
 pub mod frontend {
     pub mod cli;
     #[cfg(feature = "enable_gtk")] pub mod gtk_interface;
