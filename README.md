@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/mmstick/tv-renamer.png?branch=master)](https://travis-ci.org/mmstick/tv-renamer)
+**Build Status:** [![Build Status](https://travis-ci.org/mmstick/tv-renamer.png?branch=master)](https://travis-ci.org/mmstick/tv-renamer)
 
 # Installation Instructions
 
