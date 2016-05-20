@@ -2,7 +2,23 @@
 
 # Installation Instructions
 
-With Rust installed, simply execute `cargo install --git https://github.com/mmstick/tv-renamer` to install with just CLI support. To enable the GTK3 front-end which may be called with the `--gui` flag, simply enable the `enable_gtk` feature with `cargo install --git https://github.com/mmstick/tv-renamer --features "enable_gtk"`.
+This project is using a Makefile for generating both a CLI `tv-renamer` and GTK3 `tv-renamer-gtk` binary. If you want to have both binaries installed on your system, simply execute the default commands:
+
+```sh
+make && sudo make install
+```
+
+If you only want access to the GTK3 GUI, you can install it with:
+
+```sh
+make gtk && sudo make install-gtk
+```
+
+Where if you only want access to the CLI binary:
+
+```sh
+make cli && sudo make install-cli
+```
 
 # GTK3 Manual
 
