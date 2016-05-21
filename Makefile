@@ -1,4 +1,4 @@
-DESTDIR = /usr/bin
+DESTDIR = /usr
 
 all: gtk cli
 
@@ -12,10 +12,12 @@ cli:
 install: install-cli install-gtk
 
 install-cli:
-	cp target/release/tv-renamer "${DESTDIR}"
+	install -d "${DESTDIR}/bin"
+	install -m 755 target/release/tv-renamer "${DESTDIR}/bin/"
 
 install-gtk:
-	cp target/release/tv-renamer-gtk "${DESTDIR}"
+	install -d "${DESTDIR}/bin"
+	install -m 755 target/release/tv-renamer-gtk "${DESTDIR}/bin/"
 
 uninstall:
 	rm "${DESTDIR}/tv-renamer"
