@@ -480,6 +480,9 @@ ${TVDB_Title} = Title of Episode from TVDB</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="receives_default">True</property>
+            <style>
+              <class name="destructive-action"/>
+            </style>
           </object>
           <packing>
             <property name="pack_type">end</property>
