@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=TV Renamer
+Comment=A TV series renaming application with TVDB support, written in Rust.
+Icon=preferences-system
+Exec=tv-renamer-gtk
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=GNOME;GTK;TV;Utiliy
+Keywords=TV;Series;Renamer

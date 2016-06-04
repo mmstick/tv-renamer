@@ -22,26 +22,32 @@ pub fn tokenize_template(template: &str) -> Vec<TemplateToken> {
         if character == '$' && !matching {
             matching = true;
             pattern.push('$');
-        } else if character == '$' && matching {
-            matching = false;
-            for character in pattern.chars() {
-                tokens.push(TemplateToken::Character(character));
-            }
-            tokens.push(TemplateToken::Character('$'));
-            pattern.clear();
         } else if character == '$' {
-            tokens.push(TemplateToken::Character('$'));
-        } else if character == '{' && matching && pattern.len() == 1 {
-            pattern.push('{');
-        } else if character == '{' && matching {
-            matching = false;
-            for character in pattern.chars() {
-                tokens.push(TemplateToken::Character(character));
+            if matching {
+                matching = false;
+                for character in pattern.chars() {
+                    tokens.push(TemplateToken::Character(character));
+                }
+                tokens.push(TemplateToken::Character('$'));
+                pattern.clear();
+            } else {
+                tokens.push(TemplateToken::Character('$'));
             }
-            tokens.push(TemplateToken::Character('$'));
-            pattern.clear();
-        } else if character == '{'{
-            tokens.push(TemplateToken::Character('{'));
+        } else if character == '{' {
+            if matching {
+                if pattern.len() == 1 {
+                    pattern.push('{');
+                } else {
+                    matching = false;
+                    for character in pattern.chars() {
+                        tokens.push(TemplateToken::Character(character));
+                    }
+                    tokens.push(TemplateToken::Character('$'));
+                    pattern.clear();
+                }
+            } else {
+                tokens.push(TemplateToken::Character('{'));
+            }
         } else if character == '}' && matching {
             pattern.push('}');
             if let Some(value) = match_token(&pattern) {

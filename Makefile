@@ -12,18 +12,16 @@ cli:
 install: install-cli install-gtk
 
 install-cli:
-	install -d "${DESTDIR}/bin"
-	install -m 755 "target/release/tv-renamer" "${DESTDIR}/bin/"
+	install -Dm 755 "target/release/tv-renamer" "${DESTDIR}/bin/"
 
 install-gtk:
-	install -d "${DESTDIR}/bin"
-	install -m 755 "target/release/tv-renamer-gtk" "${DESTDIR}/bin/"
+	install -Dm 755 "target/release/tv-renamer-gtk" "${DESTDIR}/bin/"
+	install -Dm 644 "assets/tv-renamer.desktop" "${DESTDIR}/share/applications/"
 
 create-tar:
-	install -d tv-renamer
-	install -d tv-renamer/bin
-	install -m 755 "target/release/tv-renamer-gtk" "tv-renamer/bin/"
-	install -m 755 "target/release/tv-renamer" "tv-renamer/bin/"
+	install -Dm 755 "target/release/tv-renamer-gtk" "tv-renamer/bin/"
+	install -Dm 755 "target/release/tv-renamer" "tv-renamer/bin/"
+	install -Dm 644 "assets/tv-renamer.desktop" "tv-renamer/share/applications/"
 	tar cf - "tv-renamer" | xz -zf > "tv-renamer-binaries.tar.xz"
 
 uninstall:
