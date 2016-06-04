@@ -10,11 +10,11 @@ pub mod frontend {
     #[cfg(not(feature = "enable_gtk"))]
     pub mod cli;
     #[cfg(feature = "enable_gtk")]
-    pub mod gtk_interface;
+    pub mod gtk3;
 }
 
 #[cfg(not(feature = "enable_gtk"))]
 fn main() { frontend::cli::launch() }
 
 #[cfg(feature = "enable_gtk")]
-fn main() { frontend::gtk_interface::launch(); }
+fn main() { frontend::gtk3::launch(); }

@@ -5,10 +5,12 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use tvdb;
-use backend::man::MAN_PAGE;
 use backend::{self, Arguments, logging};
 use backend::tokenizer::{self, TemplateToken};
 use backend::traits::{ToFilename, Try, TryAndIgnore};
+
+mod man;
+use self::man::MAN_PAGE;
 
 const EP_NO_VAL:     &'static [u8] = b"no value was set for the episode count.";
 const EP_NAN:        &'static [u8] = b"no value was set for the episode count.";

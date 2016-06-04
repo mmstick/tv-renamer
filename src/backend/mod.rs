@@ -4,7 +4,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub mod logging;
-pub mod man;
 pub mod traits;
 pub mod tokenizer;
 
