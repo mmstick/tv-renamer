@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 pub mod logging;
 pub mod traits;
 pub mod tokenizer;
+mod mimetypes;
 
 use self::traits::Digits;
 use self::tokenizer::TemplateToken;
@@ -170,14 +171,21 @@ pub fn get_seasons(directory: &str) -> Result<Vec<PathBuf>, &str> {
     }
 }
 
-/// Collects a list of all of the episodes in a given directory.
+/// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
 pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
     if let Ok(files) = fs::read_dir(directory) {
+        let video_extensions = try!(mimetypes::get_video_extensions());
         let mut episodes = Vec::new();
         for entry in files {
             if let Ok(entry) = entry {
                 if let Ok(metadata) = entry.metadata() {
-                    if metadata.is_file() { episodes.push(entry.path()); }
+                    if metadata.is_file() {
+                        for extension in &video_extensions {
+                            if extension.as_str() == entry.path().extension().unwrap().to_str().unwrap() {
+                                episodes.push(entry.path());
+                            }
+                        }
+                    }
                 } else {
                     return Err("unable to get metadata");
                 }
