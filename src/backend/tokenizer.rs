@@ -19,22 +19,20 @@ pub fn tokenize_template(template: &str) -> Vec<TemplateToken> {
     let mut pattern = String::new();
     let mut matching = false;
     for character in template.chars() {
-        if character == '$' && !matching {
-            matching = true;
-            pattern.push('$');
-        } else if character == '$' {
-            if matching {
+        match (character, matching) {
+            ('$', true) => {
                 matching = false;
                 for character in pattern.chars() {
                     tokens.push(TemplateToken::Character(character));
                 }
                 tokens.push(TemplateToken::Character('$'));
                 pattern.clear();
-            } else {
-                tokens.push(TemplateToken::Character('$'));
-            }
-        } else if character == '{' {
-            if matching {
+            },
+            ('$', false) => {
+                matching = true;
+                pattern.push('$');
+            },
+            ('{', true) => {
                 if pattern.len() == 1 {
                     pattern.push('{');
                 } else {
@@ -45,25 +43,23 @@ pub fn tokenize_template(template: &str) -> Vec<TemplateToken> {
                     tokens.push(TemplateToken::Character('$'));
                     pattern.clear();
                 }
-            } else {
-                tokens.push(TemplateToken::Character('{'));
-            }
-        } else if character == '}' && matching {
-            pattern.push('}');
-            if let Some(value) = match_token(&pattern) {
-                tokens.push(value);
-            } else {
-                for character in pattern.chars() {
-                    tokens.push(TemplateToken::Character(character));
+            },
+            ('{', false) => tokens.push(TemplateToken::Character('{')),
+            ('}', true) => {
+                pattern.push('}');
+                if let Some(value) = match_token(&pattern) {
+                    tokens.push(value);
+                } else {
+                    for character in pattern.chars() {
+                        tokens.push(TemplateToken::Character(character));
+                    }
+                    tokens.push(TemplateToken::Character('$'));
                 }
-                tokens.push(TemplateToken::Character('$'));
-            }
-            matching = false;
-            pattern.clear();
-        } else if matching {
-            pattern.push(character);
-        } else {
-            tokens.push(TemplateToken::Character(character));
+                matching = false;
+                pattern.clear();
+            },
+            (_, true)  => pattern.push(character),
+            (_, false) => tokens.push(TemplateToken::Character(character))
         }
     }
     tokens

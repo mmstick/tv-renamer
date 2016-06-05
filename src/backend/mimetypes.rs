@@ -9,9 +9,9 @@ pub fn get_video_extensions() -> Result<Vec<String>, &'static str> {
                 Ok(_) => {
                     let mut output = Vec::new();
                     for item in contents.lines().filter(|x| x.starts_with("video")) {
-                        let fields = item.split_whitespace().skip(1).map(String::from)
-                            .collect::<Vec<String>>();
-                        for field in fields { output.push(field); }
+                        for extension in item.split_whitespace().skip(1).map(String::from).collect::<Vec<String>>() {
+                            output.push(extension);
+                        }
                     }
                     Ok(output)
                 },
