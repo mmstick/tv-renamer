@@ -1,16 +1,19 @@
 #[derive(Clone, Debug, PartialEq)]
-pub enum TemplateToken {
-    Character(char),
-    Series,
-    Season,
-    Episode,
-    TVDB,
-}
+pub enum TemplateToken { Character(char), Series, Season, Episode, TVDB }
 
 // The default template signature is `${SERIES} ${SEASON}x${EPISODE} ${TITLE}`
 pub fn default_template() -> Vec<TemplateToken> {
-    vec![TemplateToken::Series, TemplateToken::Character(' '), TemplateToken::Season, TemplateToken::Character('x'),
-        TemplateToken::Episode, TemplateToken::Character(' '), TemplateToken::TVDB]
+    vec![TemplateToken::Series,
+         TemplateToken::Character(' '),
+         TemplateToken::Character('-'),
+         TemplateToken::Character(' '),
+         TemplateToken::Season,
+         TemplateToken::Character('x'),
+         TemplateToken::Episode,
+         TemplateToken::Character(' '),
+         TemplateToken::Character('-'),
+         TemplateToken::Character(' '),
+         TemplateToken::TVDB]
 }
 
 /// This tokenizer will take the template string as input and convert it into an ordered vector of tokens.
@@ -27,11 +30,11 @@ pub fn tokenize_template(template: &str) -> Vec<TemplateToken> {
                 }
                 tokens.push(TemplateToken::Character('$'));
                 pattern.clear();
-            },
+            }
             ('$', false) => {
                 matching = true;
                 pattern.push('$');
-            },
+            }
             ('{', true) => {
                 if pattern.len() == 1 {
                     pattern.push('{');
@@ -43,23 +46,24 @@ pub fn tokenize_template(template: &str) -> Vec<TemplateToken> {
                     tokens.push(TemplateToken::Character('$'));
                     pattern.clear();
                 }
-            },
+            }
             ('{', false) => tokens.push(TemplateToken::Character('{')),
             ('}', true) => {
                 pattern.push('}');
-                if let Some(value) = match_token(&pattern) {
-                    tokens.push(value);
-                } else {
-                    for character in pattern.chars() {
-                        tokens.push(TemplateToken::Character(character));
+                match match_token(&pattern) {
+                    Some(value) => tokens.push(value),
+                    None => {
+                        for character in pattern.chars() {
+                            tokens.push(TemplateToken::Character(character));
+                        }
+                        tokens.push(TemplateToken::Character('$'));
                     }
-                    tokens.push(TemplateToken::Character('$'));
                 }
                 matching = false;
                 pattern.clear();
-            },
-            (_, true)  => pattern.push(character),
-            (_, false) => tokens.push(TemplateToken::Character(character))
+            }
+            (_, true) => pattern.push(character),
+            (_, false) => tokens.push(TemplateToken::Character(character)),
         }
     }
     tokens
@@ -78,7 +82,7 @@ fn match_token(pattern: &str) -> Option<TemplateToken> {
 
 #[test]
 fn test_tokenize() {
-    assert_eq!(default_template(), tokenize_template("${Series} ${Season}x${Episode} ${TVDB_Title}"));
+    assert_eq!(default_template(), tokenize_template("${Series} - ${Season}x${Episode} - ${TVDB_Title}"));
 }
 
 #[test]

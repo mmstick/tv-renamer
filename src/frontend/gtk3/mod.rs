@@ -140,11 +140,7 @@ pub fn launch() {
             dialog.add_button("Select", gtk::ResponseType::Ok as i32);
 
             if dialog.run() == gtk::ResponseType::Ok as i32 {
-                if let Some(path) = dialog.get_filename() {
-                    if let Some(text) = path.to_str() {
-                        directory_entry.set_text(text);
-                    }
-                }
+                dialog.get_filename().map(|path| path.to_str().map(|text| directory_entry.set_text(text)));
             }
             dialog.destroy();
 

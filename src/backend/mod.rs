@@ -9,29 +9,29 @@ pub mod tokenizer;
 mod mimetypes;
 
 use self::traits::Digits;
-use self::tokenizer::TemplateToken;
+use self::tokenizer::TemplateToken as Token;
 
 use tvdb;
 
 #[derive(Clone, Debug)]
 pub struct Arguments {
     // Automatically infer the name of a series and season number by the directory structure.
-    pub automatic:     bool,
+    pub automatic: bool,
 
     // Print the changes that would have been made without actually making any changes.
-    pub dry_run:       bool,
+    pub dry_run: bool,
 
     // Log the changes that were made to the disk.
-    pub log_changes:   bool,
+    pub log_changes: bool,
 
     // Print all changes that are being attempted and performed.
-    pub verbose:       bool,
+    pub verbose: bool,
 
     // Contains the base directory of the series to rename.
-    pub directory:     String,
+    pub directory: String,
 
     // Contains the name of the series to be renamed.
-    pub series_name:   String,
+    pub series_name: String,
 
     // Contains the season number to add to the filename and for use with TVDB lookups.
     pub season_number: usize,
@@ -40,20 +40,20 @@ pub struct Arguments {
     pub episode_count: usize,
 
     // The number of zeros to use when padding episode numbers.
-    pub pad_length:    usize,
+    pub pad_length: usize,
 
     // The template used for setting the naming scheme of episodes.
-    pub template:      Vec<TemplateToken>
+    pub template: Vec<Token>
 }
 
 impl Arguments {
     /// Given a source of episodes from a directory, this returns a list of their target paths.
     pub fn get_targets(&self, directory: &str, episodes: &[PathBuf], episode_index: usize) -> Result<Vec<PathBuf>, String> {
         let api = tvdb::Tvdb::new("0629B785CE550C8D");
-        let series_info = if self.template.contains(&TemplateToken::TVDB) {
+        let series_info = if self.template.contains(&Token::TVDB) {
             match api.search(self.series_name.as_str(), "en") {
                 Ok(reply) => Some(reply),
-                Err(_) => { return Err(String::from("unable to get TVDB series information")); }
+                Err(_)    => { return Err(String::from("unable to get TVDB series information")); }
             }
         } else {
             None
@@ -63,11 +63,11 @@ impl Arguments {
         let mut current_index = episode_index;
         for file in episodes {
             // TVDB Titles
-            let tvdb_title = if self.template.contains(&TemplateToken::TVDB) {
+            let tvdb_title = if self.template.contains(&Token::TVDB) {
                 let reply = series_info.clone().unwrap();
                 match api.episode(&reply[0], self.season_number as u32, current_index as u32) {
                     Ok(episode) => episode.episode_name,
-                    Err(_) => { return Err(format!("episode '{}' does not exist", file.to_string_lossy())); }
+                    Err(_)      => { return Err(format!("episode '{}' does not exist", file.to_string_lossy())); }
                 }
             } else {
                 String::new()
@@ -89,11 +89,11 @@ impl Arguments {
         let mut filename = String::new();
         for pattern in self.template.clone() {
             match pattern {
-                TemplateToken::Character(value) => filename.push(value),
-                TemplateToken::Series  => filename.push_str(self.series_name.clone().as_str()),
-                TemplateToken::Season  => filename.push_str(self.season_number.to_string().as_str()),
-                TemplateToken::Episode => filename.push_str(episode.to_padded_string('0', self.pad_length).as_str()),
-                TemplateToken::TVDB    => filename.push_str(title),
+                Token::Character(value) => filename.push(value),
+                Token::Series           => filename.push_str(self.series_name.clone().as_str()),
+                Token::Season           => filename.push_str(self.season_number.to_string().as_str()),
+                Token::Episode          => filename.push_str(episode.to_padded_string('0', self.pad_length).as_str()),
+                Token::TVDB             => filename.push_str(title)
             }
         }
         filename = String::from(filename.trim()); // Remove extra spaces
@@ -119,14 +119,11 @@ pub fn shorten_path(path: &Path) -> PathBuf {
         path.push(value);
         path
     } else {
-        match path.strip_prefix(&env::home_dir().unwrap()) {
-            Ok(value) => {
-                let mut path = PathBuf::from("~");
-                path.push(value);
-                path
-            },
-            Err(_) => path.to_path_buf()
-        }
+        path.strip_prefix(&env::home_dir().unwrap()).ok().map_or_else(|| path.to_path_buf(), |value| {
+            let mut path = PathBuf::from("~");
+            path.push(value);
+            path
+        })
     }
 }
 
@@ -138,66 +135,52 @@ pub fn derive_season_number(season: &Path) -> Option<usize> {
         _ => {
             directory_name = directory_name.replace("season", "");
             directory_name = directory_name.replace(" ", "");
-            if let Ok(season_number) = directory_name.parse::<usize>() {
-                Some(season_number)
-            } else {
-                None
-            }
+            directory_name.parse::<usize>().ok()
         }
     }
 }
 
 /// Collects a list of all of the seasons in a given directory.
 pub fn get_seasons(directory: &str) -> Result<Vec<PathBuf>, &str> {
-    if let Ok(files) = fs::read_dir(directory) {
+    fs::read_dir(directory).ok().map_or(Err("unable to read directory"), |files| {
         let mut seasons = Vec::new();
         for entry in files {
-            if let Ok(entry) = entry {
-                if let Ok(metadata) = entry.metadata() {
-                    if metadata.is_dir() {
-                        seasons.push(entry.path());
-                    }
-                } else {
-                    return Err("unable to get metadata");
-                }
-            } else {
-                return Err("unable to get directory entry");
-            }
+            let status = entry.ok().map_or(Some("tv-renamer: unable to get directory entry"), |entry| {
+                entry.metadata().ok().map_or(Some("tv-renamer: unable to get metadata"), |metadata| {
+                    if metadata.is_dir() { seasons.push(entry.path()); }
+                    None
+                })
+            });
+            if status.is_some() { return Err(status.unwrap()); }
         }
         seasons.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
         Ok(seasons)
-    } else {
-        Err("unable to read directory")
-    }
+    })
 }
 
 /// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
 pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
-    if let Ok(files) = fs::read_dir(directory) {
+    fs::read_dir(directory).ok().map_or(Err("unable to read file"), |files| {
         let video_extensions = try!(mimetypes::get_video_extensions());
         let mut episodes = Vec::new();
         for entry in files {
-            if let Ok(entry) = entry {
-                if let Ok(metadata) = entry.metadata() {
+            let status = entry.ok().map_or(Some("tv-renamer: unable to get file entry"), |entry| {
+                entry.metadata().ok().map_or(Some("tv-renamer: unable to get metadata"), |metadata| {
                     if metadata.is_file() {
                         for extension in &video_extensions {
-                            if extension.as_str() == entry.path().extension().unwrap().to_str().unwrap() {
+                            if extension.as_str() ==entry.path().extension().unwrap().to_str().unwrap() {
                                 episodes.push(entry.path());
                             }
                         }
                     }
-                } else {
-                    return Err("unable to get metadata");
-                }
-            } else {
-                return Err("unable to get file entry");
-            }
+                    None
+                })
+            });
+            if status.is_some() { return Err(status.unwrap()); }
         }
         episodes.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
         Ok(episodes)
-    } else {
-        Err("unable to read file")
-    }
+    })
 }
 
 #[test]

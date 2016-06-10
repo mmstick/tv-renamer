@@ -115,9 +115,9 @@ fn test_digits() {
 }
 #[test]
 fn test_padded_digits() {
-    assert_eq!(  5.to_padded_string('0', 2).as_str(), "05");
-    assert_eq!( 10.to_padded_string('0', 2).as_str(), "10");
+    assert_eq!(5.to_padded_string('0', 2).as_str(), "05");
+    assert_eq!(10.to_padded_string('0', 2).as_str(), "10");
     assert_eq!(100.to_padded_string('0', 2).as_str(), "100");
-    assert_eq!( 10.to_padded_string('0', 3).as_str(), "010");
-    assert_eq!(  5.to_padded_string('0', 3).as_str(), "005");
+    assert_eq!(10.to_padded_string('0', 3).as_str(), "010");
+    assert_eq!(5.to_padded_string('0', 3).as_str(), "005");
 }
