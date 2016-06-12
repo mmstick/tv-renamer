@@ -49,7 +49,9 @@ pub struct Arguments {
 impl Arguments {
     /// Given a source of episodes from a directory, this returns a list of their target paths.
     pub fn get_targets(&self, directory: &str, episodes: &[PathBuf], episode_index: usize) -> Result<Vec<PathBuf>, String> {
+        // The API key required by TVDB's API.
         let api = tvdb::Tvdb::new("0629B785CE550C8D");
+        // Obtain the TVDB series information if the template contains the TVDB token.
         let series_info = if self.template.contains(&Token::TVDB) {
             match api.search(self.series_name.as_str(), "en") {
                 Ok(reply) => Some(reply),
@@ -62,7 +64,7 @@ impl Arguments {
         let mut output: Vec<PathBuf> = Vec::new();
         let mut current_index = episode_index;
         for file in episodes {
-            // TVDB Titles
+            // Obtain the TVDB Title if the template contains the TVDB token.
             let tvdb_title = if self.template.contains(&Token::TVDB) {
                 let reply = series_info.clone().unwrap();
                 match api.episode(&reply[0], self.season_number as u32, current_index as u32) {
@@ -114,17 +116,14 @@ impl Arguments {
 
 /// Takes a pathname and shortens it for readability.
 pub fn shorten_path(path: &Path) -> PathBuf {
-    if let Ok(value) = path.strip_prefix(&env::current_dir().unwrap()) {
-        let mut path = PathBuf::from(".");
-        path.push(value);
-        path
-    } else {
-        path.strip_prefix(&env::home_dir().unwrap()).ok().map_or_else(|| path.to_path_buf(), |value| {
-            let mut path = PathBuf::from("~");
-            path.push(value);
-            path
-        })
-    }
+    // Attempt to strip the current working directory from the path.
+    path.strip_prefix(&env::current_dir().unwrap())
+        // If the home directory was split, return a new `PathBuf` with "." as the replacement.
+        .map(|value| PathBuf::from(".").join(value))
+        // If the current working directory could not be found, attempt to strip the home directory from the path.
+        .unwrap_or(path.strip_prefix(&env::home_dir().unwrap()).ok()
+            // Return the input path if the home directory was not found, otherwise prepend "~" to the path.
+            .map_or_else(|| path.to_path_buf(), |value| PathBuf::from("~").join(value)))
 }
 
 /// Given a directory path, derive the number of the season and assign it.
@@ -160,7 +159,7 @@ pub fn get_seasons(directory: &str) -> Result<Vec<PathBuf>, &str> {
 
 /// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
 pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
-    fs::read_dir(directory).ok().map_or(Err("unable to read file"), |files| {
+    fs::read_dir(directory).ok().map_or(Err("tv-renamer: unable to read file"), |files| {
         let video_extensions = try!(mimetypes::get_video_extensions());
         let mut episodes = Vec::new();
         for entry in files {
@@ -168,7 +167,7 @@ pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
                 entry.metadata().ok().map_or(Some("tv-renamer: unable to get metadata"), |metadata| {
                     if metadata.is_file() {
                         for extension in &video_extensions {
-                            if extension.as_str() ==entry.path().extension().unwrap().to_str().unwrap() {
+                            if extension.as_str() == entry.path().extension().unwrap().to_str().unwrap() {
                                 episodes.push(entry.path());
                             }
                         }
@@ -178,7 +177,7 @@ pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
             });
             if status.is_some() { return Err(status.unwrap()); }
         }
-        episodes.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
+        episodes.sort_by(|a, b| a.to_string_lossy().to_lowercase().cmp(&b.to_string_lossy().to_lowercase()));
         Ok(episodes)
     })
 }

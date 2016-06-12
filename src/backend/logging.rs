@@ -7,11 +7,16 @@ use backend::shorten_path;
 
 /// Returns a handle to the log file if it could be opened.
 fn open_log() -> Result<fs::File, String> {
-    env::home_dir().map_or_else(|| Err(String::from("tv-renamer: unable to get home directory")), |mut path| {
-        path.push("tv-renamer.log");
-        fs::OpenOptions::new().create(true).append(true).open(path)
-            .map_err(|err| format!("tv-renamer: unable to open log file: {}", err.to_string()))
-    })
+    env::home_dir()
+        // Return an error if the home directory could not be obtained.
+        .map_or_else(|| Err(String::from("tv-renamer: unable to get home directory")), |mut path| {
+            // Add the log file to the path
+            path.push("tv-renamer.log");
+            // Attempt to return the file with append mode enabled, and create the file if it does not exist.
+            fs::OpenOptions::new().create(true).append(true).open(path)
+                // If an error occurs, return the error as a formatted `String`.
+                .map_err(|err| format!("tv-renamer: unable to open log file: {}", err.to_string()))
+        })
 }
 
 /// Appends the current time to the log file.
