@@ -3,13 +3,13 @@ pub const MAN_PAGE: &'static str = r#"NAME:
 
 SYNOPSIS:
     tv-renamer DIRECTORY [-a | --automatic]
-                           [-d | --dry-run]
-                           [-l | --log-changes]
-                           [-n | --series-name "NAME OF SERIES"]
-                           [-s | --season-number NUMBER]
-                           [-t | --template "TEMPLATE"]
-                           [-p | --pad-length NUMBER]
-                           [-e | --episode-start NUMBER]
+                         [-d | --dry-run]
+                         [-l | --log-changes]
+                         [-n | --series-name "NAME OF SERIES"]
+                         [-s | --season-number NUMBER]
+                         [-t | --template "TEMPLATE"]
+                         [-p | --pad-length NUMBER]
+                         [-e | --episode-start NUMBER]
 
 DESCRIPTION:
     Renames all videos in a directory according to their season number and episode count.
@@ -24,7 +24,7 @@ DESCRIPTION:
 
 OPTIONS:
     -a, --automatic:
-        Automatically infer the season name and number based on the directory structure.
+        Rename all seasons within a TV series directory and infer the series name from the base directory.
 
     -d, --dry-run:
         Runs through all of the files and prints what would happen without doing anything.
@@ -40,7 +40,7 @@ OPTIONS:
 
     -t, --template:
         Sets the template that will define the naming scheme.
-        [default: "${Series} ${Season}x${Episode} ${TVDB_Title}"]
+        [default: "${Series} - ${Season}x${Episode} - ${TVDB_Title}"]
 
     -e, --episode-start:
         Sets the episode number to start counting from. [default: 1]
@@ -54,19 +54,24 @@ OPTIONS:
 EXAMPLE:
     When executed inside of a directory with the name of the TV Series
         > one.mkv two.mkv three.mkv
-        > tv-renamer -n "Name of Season"
-        > "TV Series 1x01 Episode Title.mkv" "TV Series 1x02 Episode Title.mkv" "TV Series 1x03 Episode Title.mkv"
+        > tv-renamer cli
+        > "TV Series - 1x01 - Episode Title.mkv"
+        > "TV Series - 1x02 - Episode Title.mkv"
+        > "TV Series - 1x03 - Episode Title.mkv"
 
     You can define your own naming scheme with --template:
         > one.mkv two.mkv three.mkv
-        > tv-renamer -t "${Series} S${Season}E${Episode} - ${TVDB_Title}"
-        > "TV Series S1E01 - Episode Title.mkv" "TV Series S1E02 - Episode Title.mkv" "TV Series S1E03 - Episode Title.mkv"
+        > tv-renamer cli -t "${Series} S${Season}E${Episode} - ${TVDB_Title}"
+        > "TV Series S1E01 - Episode Title.mkv"
+        > "TV Series S1E02 - Episode Title.mkv"
+        > "TV Series S1E03 - Episode Title.mkv"
 
     The season name can also be automatically inferred:
         > "TV Series/Season1"
         > "TV Series/Season2"
-        > tv-renamer "TV Series" -a
-        > "TV Series/Season1/TV Series 1x01.mkv" ... "TV Series/Season2/TV Series 2x01.mkv" ...
+        > tv-renamer cli "TV Series" -a
+        > "TV Series/Season1/TV Series - 1x01 - Episode Title.mkv"
+        > "TV Series/Season2/TV Series - 2x01 - Episode Title.mkv"
 
 AUTHOR:
     Written by Michael Aaron Murphy.

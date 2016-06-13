@@ -26,8 +26,8 @@ const TOO_MANY_ARGS: &'static [u8] = b"too many extra arguments given to the pro
 const STDERR_ERROR:  &'static [u8] = b"error writing to stderr: ";
 const STDOUT_ERROR:  &'static [u8] = b"error writing to stdout: ";
 
-impl Default for Arguments {
-    fn default() -> Arguments {
+impl Arguments {
+    fn new(arguments: &[String]) -> Arguments {
         let stdout = io::stdout();
         let stdout = &mut stdout.lock();
         let stderr = &mut io::stderr();
@@ -48,7 +48,7 @@ impl Default for Arguments {
 
         // Create a peekable iterator so that we can see the value of some options.
         // We will also need to ignore values that have already been read.
-        let mut iterator = env::args().skip(1).peekable();
+        let mut iterator = arguments.iter().peekable();
         let mut ignore = false;
 
         // Advance the iterator in a loop until all values have been read.
@@ -88,7 +88,7 @@ impl Default for Arguments {
                     _ => abort_with_message(stderr, INVALID_ARG)
                 }
             } else if program.directory.is_empty() {
-                program.directory = argument;
+                program.directory = argument.clone();
             } else {
                 println!("{}", argument);
                 abort_with_message(stderr, TOO_MANY_ARGS)
@@ -101,21 +101,12 @@ impl Default for Arguments {
         }
 
         // If no series name was given, ask for the name.
-        if program.series_name.is_empty() && !program.automatic {
-            stdout.write(b"Please enter the name of the series: ").try(STDOUT_ERROR, stderr);
-            stdout.flush().try(STDOUT_ERROR, stderr);
-            io::stdin().read_line(&mut program.series_name).try(b"unable to read from stdin: ", stderr);
-            program.series_name.pop().unwrap();
+        if program.series_name.is_empty() {
+            program.series_name = String::from(Path::new(&program.directory).file_name().unwrap().to_str().unwrap());
         }
-
-        // If no template was defined, set set the default template.
-        if program.template.is_empty() { tokenizer::default_template(); }
 
         program
     }
-}
-
-impl Arguments {
     /// Renames all episodes belonging to a season.
     fn rename_episodes_cli(&self, directory: &Path, stderr: &mut io::Stderr, stdout: &mut io::Stdout) {
         // If TVDB is enabled, create the API and search for the series information.
@@ -134,16 +125,15 @@ impl Arguments {
         };
 
         // Get a list of episodes
-        let episodes = match backend::get_episodes(directory.to_str().unwrap()) {
-            Ok(episodes) => episodes,
-            Err(err) => panic!("{}", err)
-        };
+        let episodes = backend::get_episodes(directory.to_str().unwrap()).unwrap_or_else(|err| panic!("{}", err));
 
         let mut current_episode = self.episode_count;
         for source in episodes {
             // If TVDB is enabled, get the episode title from the series information, else return an empty string.
             let title = if self.template.contains(&TemplateToken::TVDB) {
-                let reply = series_info.clone().unwrap();
+                let reply = series_info.clone()
+                    .unwrap_or_else(|| panic!("tv-renamer: could not clone series: {:?}", source));
+                // let episode_name = api.episode(&reply[0], self.season_number as u32, current_episode as u32)
                 match api.episode(&reply[0], self.season_number as u32, current_episode as u32) {
                     Ok(episode) => episode.episode_name,
                     Err(_) => {
@@ -187,10 +177,10 @@ impl Arguments {
     }
 }
 
-pub fn launch() {
+pub fn launch(arguments: &[String]) {
     let stderr = &mut io::stderr();
     let stdout = &mut io::stdout();
-    let program = &mut Arguments::default();
+    let program = &mut Arguments::new(arguments);
 
     if program.log_changes { logging::append_time(); }
 

@@ -1,24 +1,23 @@
 DESTDIR = /usr
 
-all: gtk cli
+all: gtk
 
 gtk:
 	cargo build --release --features "enable_gtk"
-	mv "target/release/tv-renamer" "target/release/tv-renamer-gtk"
+	echo "#!/bin/sh" > "target/release/tv-renamer-gtk"
+	echo "tv-renamer gtk" >> "target/release/tv-renamer-gtk"
 
 cli:
 	cargo build --release
 
-install: install-cli install-gtk
-
-install-cli:
+install-cli: install-docs
 	install -Dm 755 "target/release/tv-renamer" "${DESTDIR}/bin/"
-	install -Dm 644 README.md "${DESTDIR}/share/doc/tv-renamer/README"
-	install -Dm 644 LICENSE "${DESTDIR}/share/licenses/tv-renamer/COPYING"
 
-install-gtk:
+install-gtk: install-cli install-docs
 	install -Dm 755 "target/release/tv-renamer-gtk" "${DESTDIR}/bin/"
 	install -Dm 644 "assets/tv-renamer.desktop" "${DESTDIR}/share/applications/"
+
+install-docs:
 	install -Dm 644 README.md "${DESTDIR}/share/doc/tv-renamer/README"
 	install -Dm 644 LICENSE "${DESTDIR}/share/licenses/tv-renamer/COPYING"
 

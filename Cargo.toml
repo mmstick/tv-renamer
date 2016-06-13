@@ -16,3 +16,10 @@ chrono = "0.2.21"
 tvdb = "0.2.0"
 gtk = { version = "0.0.7", features = ["v3_14"], optional = true }
 gdk = { version = "0.3.0", optional = true }
+
+[profile.release]
+debug = false
+debug-assertions = false
+lto = true
+opt-level = 2
+rpath = false
