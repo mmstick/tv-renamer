@@ -6,7 +6,7 @@ description = "A TV series renaming application that supports adding titles to e
 repository = "https://github.com/mmstick/tv-renamer"
 readme = "README.md"
 keywords = ["gtk", "media", "rename", "tv", "tvdb"]
-license = "LGPL-3.0"
+license = "MIT"
 
 [features]
 enable_gtk = ["gtk", "gdk"]
