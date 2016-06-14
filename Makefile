@@ -32,6 +32,8 @@ deb:
 	dpkg -s libgtk-3-dev >/dev/null 2>&1 || sudo apt install libgtk-3-dev -y
 	dpkg -s libssl-dev >/dev/null 2>&1 || sudo apt install libssl-dev -y
 	cargo build --release --features "enable_gtk"
+	echo "#!/bin/sh" > "target/release/tv-renamer-gtk"
+	echo "tv-renamer gtk" >> "target/release/tv-renamer-gtk"
 	sed "2s/.*/Version: $(version)/g" -i "debian/DEBIAN/control"
 	sed "7s/.*/Architecture: $(shell dpkg --print-architecture)/g" -i "debian/DEBIAN/control"
 	install -Dsm 755 "target/release/tv-renamer" "debian/usr/bin/tv-renamer"
