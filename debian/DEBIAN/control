@@ -1,9 +1,0 @@
-Package: tv-renamer
-Version: $version
-Section: utility
-Priority: optional
-Standards-Version: 3.9.4
-Maintainer: Michael Aaron Murphy <mmstickman@gmail.com>
-Architecture: $arch
-Depends: libc6, libgtk-3-0 (>= 3.16), libssl (>= 1.0)
-Description: A TV series renaming application with TVDB support, written in Rust.
