@@ -32,6 +32,7 @@ deb:
 	dpkg -s libgtk-3-dev >/dev/null 2>&1 || sudo apt install libgtk-3-dev -y
 	dpkg -s libssl-dev >/dev/null 2>&1 || sudo apt install libssl-dev -y
 	cargo build --release --features "enable_gtk"
+	strip --strip-unneeded target/release/tv-renamer
 	cargo deb --no-build
 
 
