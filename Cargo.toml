@@ -1,12 +1,29 @@
 [package]
 name = "tv-renamer"
 version = "0.2.6"
-authors = ["Michael Aaron Murphy <mmstickman@gmail.com>"]
-description = "A TV series renaming application that supports adding titles to episodes using TVDB and sports a CLI and optional GTK3 interface"
-repository = "https://github.com/mmstick/tv-renamer"
-readme = "README.md"
-keywords = ["gtk", "media", "rename", "tv", "tvdb"]
 license = "MIT"
+authors = ["Michael Aaron Murphy <mmstickman@gmail.com>"]
+description = "TV renaming application with TVDB titles and templating support"
+repository = "https://github.com/mmstick/tv-renamer"
+keywords = ["gtk", "media", "rename", "tv", "tvdb"]
+readme = "README.md"
+
+[package.metadata.deb]
+maintainer = "Michael Aaron Murphy <mmstickman@gmail.com>"
+copyright = "2015-2016, Michael Aaron Murphy <mmstickman@gmail.com>"
+license_file = ["LICENSE", "3"]
+depends = "libc6, libgtk-3-0 (>= 3.16), libssl1.0.0"
+extended_description = """\
+A TV series renaming application that supports adding titles to \
+episodes using TVDB and sports both a CLI and optional GTK3 interface."""
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/tv-renamer", "usr/bin/", "755"],
+    ["assets/tv-renamer-gtk", "usr/bin/", "755"],
+    ["assets/tv-renamer.desktop", "usr/share/applications/", "644"],
+    ["README.md", "usr/share/doc/tv-renamer/README", "644"]
+]
 
 [features]
 enable_gtk = ["gtk", "gdk"]

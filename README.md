@@ -13,12 +13,12 @@
 
 # Installation Instructions
 
-This project is using a Makefile for generating a busybox-style binary, named **tv-renamer**, which provides two options: **cli** and **gtk**. The default make option will build the binary with the GTK3 interface feature enabled. To build without the GTK3 interface, use `make cli` instead of `make`.
+This project is using a Makefile for generating a busybox-style binary, named **tv-renamer**, which provides two options: **cli** and **gtk**. Ensure that you have a modern stable version of Rust installed via [rustup](https://www.rustup.rs/). If you are packaging for Debian, ensure that you have [cargo deb](https://github.com/mmstick/cargo-deb) installed. The default make option will build the binary with the GTK3 interface feature enabled. To build without the GTK3 interface, use `make cli` instead of `make`.
 
 ## With GTK3 Enabled
 
 ```sh
-make && sudo make install-gtk
+make && sudo make install
 ```
 
 ## CLI-only
