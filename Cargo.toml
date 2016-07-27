@@ -1,6 +1,6 @@
 [package]
 name = "tv-renamer"
-version = "0.2.6"
+version = "0.2.7"
 license = "MIT"
 authors = ["Michael Aaron Murphy <mmstickman@gmail.com>"]
 description = "TV renaming application with TVDB titles and templating support"
@@ -30,9 +30,9 @@ enable_gtk = ["gtk", "gdk"]
 
 [dependencies]
 chrono = "0.2.21"
-tvdb = "0.2.0"
-gtk = { version = "0.0.7", features = ["v3_14"], optional = true }
-gdk = { version = "0.3.0", optional = true }
+tvdb = "0.4.0"
+gtk = { version = "0.1.0", features = ["v3_14"], optional = true }
+gdk = { version = "0.5.0", optional = true }
 
 [profile.release]
 debug = false

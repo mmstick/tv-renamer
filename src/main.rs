@@ -12,6 +12,27 @@ pub mod frontend {
     pub mod gtk3;
 }
 
+use std::env;
+use std::io;
+use std::process::exit;
+
+fn main() {
+    let stderr = &mut io::stderr();
+
+    let arguments = env::args().skip(1).collect::<Vec<String>>();
+
+    let command = arguments.get(0).unwrap_or_else(|| {
+        frontend::cli::launch(&arguments, stderr);
+        exit(0);
+    });
+
+    match command.as_str() {
+        "cli" => frontend::cli::launch(&arguments[1..], stderr),
+        "gtk" => launch_gtk_interface(),
+        _     => frontend::cli::launch(&arguments, stderr)
+    }
+}
+
 #[cfg(not(feature = "enable_gtk"))]
 fn launch_gtk_interface() {
     println!("tv-renamer: tv-renamer was not built with GTK3 support.");
@@ -20,15 +41,4 @@ fn launch_gtk_interface() {
 #[cfg(feature = "enable_gtk")]
 fn launch_gtk_interface() {
     frontend::gtk3::launch();
-}
-
-fn main() {
-    let mut iter = std::env::args().skip(1);
-    let command = iter.next().unwrap_or(String::from("cli"));
-    let arguments = iter.collect::<Vec<String>>();
-    match command.as_str() {
-        "cli" => frontend::cli::launch(&arguments),
-        "gtk" => launch_gtk_interface(),
-        _     => panic!("tv-renamer: expected argument `cli` or `gtk`")
-    }
 }

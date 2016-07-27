@@ -141,10 +141,10 @@ pub fn launch() {
                 Some(&Window::new(WindowType::Popup)),
                 gtk::FileChooserAction::SelectFolder,
             );
-            dialog.add_button("Cancel", gtk::ResponseType::Cancel as i32);
-            dialog.add_button("Select", gtk::ResponseType::Ok as i32);
+            dialog.add_button("Cancel", gtk::ResponseType::Cancel.into());
+            dialog.add_button("Select", gtk::ResponseType::Ok.into());
 
-            if dialog.run() == gtk::ResponseType::Ok as i32 {
+            if dialog.run() == gtk::ResponseType::Ok.into() {
                 dialog.get_filename().map(|path| path.to_str().map(|text| directory_entry.set_text(text)));
             }
             dialog.destroy();

@@ -18,7 +18,7 @@ This project is using a Makefile for generating a busybox-style binary, named **
 ## With GTK3 Enabled
 
 ```sh
-make && sudo make install
+make && sudo make install-gtk3
 ```
 
 ## CLI-only
@@ -64,7 +64,7 @@ The directory structure for **Automatic** should be as follows:
 
 # CLI Manual
 
-If you need help with the usage of the CLI application, this manual page is also included in the program and is invokable with the -h and --help flags. The CLI interface is invoked by executing `tv-renamer cli`, followed by your arguments of choice.
+If you need help with the usage of the CLI application, this manual page is also included in the program and is invokable with the -h and --help flags. The CLI interface is invoked by executing `tv-renamer cli` or `tv-renamer`, followed by your arguments of choice.
 
 ![CLI Screenshot](screenshot-cli.png)
 

@@ -177,8 +177,7 @@ impl Arguments {
     }
 }
 
-pub fn launch(arguments: &[String]) {
-    let stderr = &mut io::stderr();
+pub fn launch(arguments: &[String], stderr: &mut io::Stderr) {
     let stdout = &mut io::stdout();
     let program = &mut Arguments::new(arguments);
 

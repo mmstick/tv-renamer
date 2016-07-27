@@ -13,7 +13,7 @@ install-cli: install-docs
 	install -Dm 755 "target/release/tv-renamer" "${DESTDIR}/bin/tv-renamer"
 
 install-gtk: install-cli install-docs
-	install -Dm 755 "assets/tv-renamer-gtk" "${DESTDIR}/bin/tv-renamer"
+	install -Dm 755 "assets/tv-renamer-gtk" "${DESTDIR}/bin/tv-renamer-gtk"
 	install -Dm 644 "assets/tv-renamer.desktop" "${DESTDIR}/share/applications/tv-renamer.desktop"
 
 install-docs:
