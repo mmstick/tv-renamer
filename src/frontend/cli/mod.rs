@@ -1,211 +1,226 @@
+mod man;
+use backend::{self, Arguments, Season, ScanDir, ReadDirError, TargetErr};
+use backend::tokenizer;
+use self::man::MAN_PAGE;
 use std::env;
+use std::io::{self, Write, Read};
 use std::fs;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process;
 
-use tvdb;
-use backend::{self, Arguments, logging};
-use backend::tokenizer::{self, TemplateToken};
-use backend::traits::{ToFilename, Try, TryAndIgnore};
+const EP_NO_VAL:     &'static str = "no value was set for the episode count.\n";
+const SR_NO_VAL:     &'static str = "no value was set for the series name.\n";
+const SN_NO_VAL:     &'static str = "no value was set for the season number.\n";
+const PD_NO_VAL:     &'static str = "no value was set for the pad length.\n";
+const TMP_NO_VAL:    &'static str = "no value was set for the template.\n";
 
-mod man;
-use self::man::MAN_PAGE;
+pub fn interface(args: &[String]) {
+    let stderr = &mut io::stderr();
 
-const EP_NO_VAL:     &'static [u8] = b"no value was set for the episode count.";
-const EP_NAN:        &'static [u8] = b"no value was set for the episode count.";
-const SR_NO_VAL:     &'static [u8] = b"no value was set for the series name.";
-const SN_NO_VAL:     &'static [u8] = b"no value was set for the season number.";
-const SN_NAN:        &'static [u8] = b"value set for season number is not a number.";
-const PD_NO_VAL:     &'static [u8] = b"no value was set for the pad length.";
-const PD_NAN:        &'static [u8] = b"value set for pad length is not a number.";
-const TMP_NO_VAL:    &'static [u8] = b"no value was set for the template.";
-const INVALID_CWD:   &'static [u8] = b"unable to get the current working directory.";
-const INVALID_ARG:   &'static [u8] = b"invalid argument was given.";
-const TOO_MANY_ARGS: &'static [u8] = b"too many extra arguments given to the program.";
-const STDERR_ERROR:  &'static [u8] = b"error writing to stderr: ";
-const STDOUT_ERROR:  &'static [u8] = b"error writing to stdout: ";
+    // Default CLI arguments
+    let mut arguments = Arguments {
+        dry_run:        false,
+        verbose:        false,
+        season_index:   1,
+        episode_index:  1,
+        pad_length:     2,
+        base_directory: String::with_capacity(256),
+        series_name:    String::with_capacity(64),
+        template:       tokenizer::default_template(),
+    };
 
-impl Arguments {
-    fn new(arguments: &[String]) -> Arguments {
-        let stdout = io::stdout();
-        let stdout = &mut stdout.lock();
-        let stderr = &mut io::stderr();
-
-        // Initialize the default variables of the program.
-        let mut program = Arguments {
-            automatic:     false,
-            dry_run:       false,
-            log_changes:   false,
-            verbose:       false,
-            directory:     String::new(),
-            series_name:   String::new(),
-            season_number: 1,
-            episode_count: 1,
-            pad_length:    2,
-            template:      tokenizer::default_template(),
-        };
-
-        // Create a peekable iterator so that we can see the value of some options.
-        // We will also need to ignore values that have already been read.
-        let mut iterator = arguments.iter().peekable();
-        let mut ignore = false;
-
-        // Advance the iterator in a loop until all values have been read.
-        while let Some(argument) = iterator.next() {
-            if ignore { ignore = false; continue }
-            if argument.starts_with('-') {
-                match argument.as_str() {
-                    "-a" | "--automatic" => program.automatic = true,
-                    "-h" | "--help" => {
-                        let _ = stdout.write(MAN_PAGE.as_bytes());
-                        let _ = stdout.flush();
-                        process::exit(0);
-                    }
-                    "-d" | "--dry-run" => program.dry_run = true,
-                    "-e" | "--episode-start" => {
-                        program.episode_count = iterator.peek().try(EP_NO_VAL, stderr).parse::<usize>()
-                            .try_and_ignore(EP_NAN, stderr);
-                        ignore = true;
-                    },
-                    "-l" | "--log-changes" => program.log_changes = true,
-                    "-n" | "--series-name" => {
-                        program.series_name.push_str(iterator.peek().try(SR_NO_VAL, stderr));
-                        ignore = true;
-                    },
-                    "-s" | "--season-number" => {
-                        program.season_number = iterator.peek().try(SN_NO_VAL, stderr).parse::<usize>()
-                            .try_and_ignore(SN_NAN, stderr);
-                        ignore = true;
-                    },
-                    "-t" | "--template" => {
-                        program.template = tokenizer::tokenize_template(iterator.peek().try(TMP_NO_VAL, stderr).as_str());
-                        ignore = true;
-                    },
-                    "-p" | "--pad-length" => program.pad_length = iterator.peek().try(PD_NO_VAL, stderr)
-                        .parse::<usize>().try_and_ignore(PD_NAN, stderr),
-                    "-v" | "--verbose" => program.verbose = true,
-                    _ => abort_with_message(stderr, INVALID_ARG)
-                }
-            } else if program.directory.is_empty() {
-                program.directory = argument.clone();
-            } else {
-                println!("{}", argument);
-                abort_with_message(stderr, TOO_MANY_ARGS)
-            }
+    // Attempt to parse the input arguments and act upon any errors that are returned
+    if let Err(why) = parse_arguments(&mut arguments, args) {
+        let _ = stderr.write(b"tv-renamer: ");
+        match why {
+            ParseError::NoEpisodeIndex           => { let _ = stderr.write(EP_NO_VAL.as_bytes()); },
+            ParseError::NoSeriesIndex            => { let _ = stderr.write(SR_NO_VAL.as_bytes()); },
+            ParseError::NoSeriesName             => { let _ = stderr.write(SN_NO_VAL.as_bytes()); },
+            ParseError::NoTemplate               => { let _ = stderr.write(TMP_NO_VAL.as_bytes()); },
+            ParseError::NoPadLength              => { let _ = stderr.write(PD_NO_VAL.as_bytes()); },
+            ParseError::EpisodeIndexIsNaN(value) => { let _ = write!(stderr, "episode index, `{}`, is not a number\n", value); },
+            ParseError::SeriesIndexIsNaN(value)  => { let _ = write!(stderr, "series index, `{}`, is not a number\n", value); },
+            ParseError::PadLengthIsNaN(value)    => { let _ = write!(stderr, "pad length, `{}`, is not a number\n", value); },
+            ParseError::InvalidArgument(value)   => { let _ = write!(stderr, "invalid argument: `{}`\n", value); },
+            ParseError::TooManyArguments(value)  => { let _ = write!(stderr, "too many arguments: `{}`\n", value); }
+            ParseError::NoCWD                    => { let _ = stderr.write(b"unable to get current working directory\n"); },
+            ParseError::CWDNotValid              => { let _ = stderr.write(b"current working directory is not valid UTF-8\n"); }
         }
-
-        // Set to current working directory if no directory argument is given.
-        if program.directory.is_empty() {
-            program.directory = String::from(env::current_dir().try_and_ignore(INVALID_CWD, stderr).to_str().unwrap());
-        }
-
-        // If no series name was given, ask for the name.
-        if program.series_name.is_empty() {
-            program.series_name = String::from(Path::new(&program.directory).file_name().unwrap().to_str().unwrap());
-        }
-
-        program
+        process::exit(1);
     }
-    /// Renames all episodes belonging to a season.
-    fn rename_episodes_cli(&self, directory: &Path, stderr: &mut io::Stderr, stdout: &mut io::Stdout) {
-        // If TVDB is enabled, create the API and search for the series information.
-        let api = tvdb::Tvdb::new("0629B785CE550C8D");
-        let series_info = if self.template.contains(&TemplateToken::TVDB) {
-            match api.search(self.series_name.as_str(), "en") {
-                Ok(reply) => Some(reply),
-                Err(_) => {
-                    stderr.write(b"tv-renamer: unable to get series information.\n").try(STDERR_ERROR, stderr);
-                    stderr.flush().try(STDERR_ERROR, stderr);
-                    process::exit(1);
-                }
-            }
-        } else {
-            None
-        };
 
-        // Get a list of episodes
-        let episodes = backend::get_episodes(directory.to_str().unwrap()).unwrap_or_else(|err| panic!("{}", err));
-
-        let mut current_episode = self.episode_count;
-        for source in episodes {
-            // If TVDB is enabled, get the episode title from the series information, else return an empty string.
-            let title = if self.template.contains(&TemplateToken::TVDB) {
-                let reply = series_info.clone()
-                    .unwrap_or_else(|| panic!("tv-renamer: could not clone series: {:?}", source));
-                // let episode_name = api.episode(&reply[0], self.season_number as u32, current_episode as u32)
-                match api.episode(&reply[0], self.season_number as u32, current_episode as u32) {
-                    Ok(episode) => episode.episode_name,
-                    Err(_) => {
-                        println!("tv-renamer: episode '{}' does not exist", source.to_string_lossy());
-                        current_episode += 1;
-                        continue
-                    }
-                }
-            } else {
-                String::new()
+    // Collect a list of episodes within a directory and rename them.
+    match backend::scan_directory(&arguments.base_directory, arguments.season_index) {
+        // If the directory contains episodes, rename the episodes.
+        Ok(ScanDir::Episodes(season)) => rename_season(stderr, &season, &arguments, arguments.episode_index),
+        // If the directory contains seasons, rename the episodes in each season.
+        Ok(ScanDir::Seasons(seasons)) => for season in seasons { rename_season(stderr, &season, &arguments, 1); },
+        // If an error occurred, print an error and exit.
+        Err(why) => {
+            let _ = stderr.write(b"tv-renamer: ");
+            let message: &[u8] = match why {
+                ReadDirError::UnableToReadDir => b"unable to read directory",
+                ReadDirError::InvalidDirEntry => b"directory entry is invalid",
+                ReadDirError::MimeFileErr     => b"unable to open /etc/mime.types",
+                ReadDirError::MimeStringErr   => b"unable to read /etc/mime.types to string"
             };
-
-            // Obtain target destination.
-            let target = self.get_destination(directory, &source, current_episode, &title);
-
-            // Print a message if the source already exists, else rename the source if dry-run is disabled.
-            if fs::metadata(&target).is_ok() {
-                stdout.write(b"tv-renamer: ").try(STDOUT_ERROR, stderr);
-                stdout.write(target.to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
-                stdout.write(b" already exists, not renaming.\n").try(STDOUT_ERROR, stderr);
-                stdout.flush().try(STDOUT_ERROR, stderr);
-            } else if !self.dry_run {
-                fs::rename(&source, &target).try(b"unable to rename source: ", stderr);
-            }
-
-            // If verbose or dry-run is enabled, print the change that occurred.
-            if self.verbose | self.dry_run {
-                stdout.write(b"\x1b[1m\x1b[32m").try(b"error writing to stdout: ", stderr);
-                stdout.write(backend::shorten_path(&source).to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
-                stdout.write(b"\x1b[0m ->  \x1b[1m\x1b[32m").try(STDOUT_ERROR, stderr);
-                stdout.write(backend::shorten_path(&target).to_string_lossy().as_bytes()).try(STDOUT_ERROR, stderr);
-                stdout.write(b"\x1b[0m\n").try(STDOUT_ERROR, stderr);
-                stdout.flush().try(STDOUT_ERROR, stderr);
-            }
-
-            // Write the changes to the log if logging is enabled.
-            if self.log_changes { logging::append_change(source.as_path(), target.as_path()); }
-
-            current_episode += 1;
+            let _ = stderr.write(message);
+            let _ = stderr.write(b"\n");
+            process::exit(1);
         }
     }
 }
 
-pub fn launch(arguments: &[String], stderr: &mut io::Stderr) {
+/// Renames all of the episodes in given season
+fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments, episode_no: usize) {
     let stdout = &mut io::stdout();
-    let program = &mut Arguments::new(arguments);
+    let mut episode_no = episode_no;
+    for source in &season.episodes {
+        // Collect the target destination for the source episode to be renamed to
+        match backend::collect_target(&source, season.season_no, episode_no, &arguments.series_name,
+            &arguments.template, arguments.pad_length)
+        {
+            Ok(target) => {
+                // If the target exists, do not overwrite the target without first asking if it is OK.
+                if target.exists() {
+                    println!("tv-renamer: episode to be renamed already exists:\n{:?}Is it okay to overwrite? (y/n)", &target);
+                    let mut input = [b'n'; 1];
+                    io::stdin().read_exact(&mut input).unwrap();
+                    if input[0] != b'y' {
+                        println!("tv-renamer: stopping the renaming process.\n");
+                        process::exit(1);
+                    }
+                }
 
-    if program.log_changes { logging::append_time(); }
+                // If dry run or verbose is enabled, print the action being taken
+                if arguments.verbose || arguments.dry_run {
+                    let _ = stdout.write(b"\x1b[1m\x1b[32m");
+                    let _ = write!(stdout, "{:?}", backend::shorten_path(&source));
+                    let _ = stdout.write(b"\x1b[0m -> ");
+                    let _ = stdout.write(b"\x1b[1m\x1b[32m");
+                    let _ = write!(stdout, "{:?}", backend::shorten_path(&target));
+                    let _ = stdout.write(b"\x1b[0m\n");
+                }
 
-    if program.automatic {
-        let series = PathBuf::from(&program.directory);
-        program.series_name = series.to_filename();
-        let seasons = match backend::get_seasons(&program.directory) {
-            Ok(seasons) => seasons,
-            Err(err) => panic!("{}", err)
-        };
-        for season in seasons {
-            if let Some(number) = backend::derive_season_number(&season) {
-                program.season_number = number;
-                program.rename_episodes_cli(&season, stderr, stdout);
+                // If dry run is not enabled, rename the file
+                if !arguments.dry_run {
+                    if let Err(cause) = fs::rename(&source, &target) {
+                        let _ = write!(stderr, "tv-renamer: rename failed: {:?}\n", cause.to_string());
+                        process::exit(1);
+                    }
+                }
+
+            },
+            Err(why) => {
+                let _ = stderr.write(b"tv-renamer: unable to find ");
+                match why {
+                    // The TV series was unable to be found on the TVDB.
+                    TargetErr::TvdbSeriesLookupFailed  => { let _ = write!(stderr, "TV series: {}\n", &arguments.series_name); },
+                    // The episode number was unable to be found in the TV series.
+                    TargetErr::TvdbEpisodeDoesNotExist => { let _ = write!(stderr, "episode {}\n", episode_no); }
+                }
+                process::exit(1);
             }
         }
-    } else {
-        program.rename_episodes_cli(Path::new(&program.directory), stderr, stdout);
+        episode_no += 1;
     }
 }
 
-#[inline]
-/// Print an error message and abort with an exit status of 1.
-fn abort_with_message(stderr: &mut io::Stderr, message: &[u8]) {
-    stderr.write(b"tv-renamer: ").try(b"error writing to stderr: ", stderr);
-    stderr.write(message).try(b"error writing to stderr: ", stderr);
-    stderr.flush().try(b"error writing to stderr: ", stderr);
-    process::exit(1);
+enum ParseError {
+    NoEpisodeIndex,
+    NoSeriesIndex,
+    NoSeriesName,
+    NoTemplate,
+    NoPadLength,
+    EpisodeIndexIsNaN(String),
+    SeriesIndexIsNaN(String),
+    PadLengthIsNaN(String),
+    InvalidArgument(String),
+    TooManyArguments(String),
+    NoCWD,
+    CWDNotValid,
+}
+
+/// Parse command-line arguments and update the `arguments` structure accordingly.
+fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), ParseError> {
+    let mut iterator = args.iter().peekable();
+    while let Some(argument) = iterator.next() {
+        if argument.starts_with('-') {
+            match argument.as_str() {
+                "-h" | "--help" => {
+                    println!("{}", MAN_PAGE);
+                    process::exit(0);
+                }
+                "-d" | "--dry-run" => arguments.dry_run = true,
+                "-e" | "--episode-start" => {
+                    match iterator.peek() {
+                        Some(value) => match value.parse::<usize>().ok() {
+                            Some(value) => arguments.episode_index = value,
+                            None        => return Err(ParseError::EpisodeIndexIsNaN((*value).clone()))
+                        },
+                        None => return Err(ParseError::NoEpisodeIndex)
+                    }
+                    let _ = iterator.next();
+                },
+                "-n" | "--series-name" => {
+                    match iterator.peek() {
+                        Some(value) => arguments.series_name.push_str(value),
+                        None        => return Err(ParseError::NoSeriesName)
+                    }
+                    let _ = iterator.next();
+                },
+                "-s" | "--season-number" => {
+                    match iterator.peek() {
+                        Some(value) => match value.parse::<usize>().ok() {
+                            Some(value) => arguments.season_index = value,
+                            None => return Err(ParseError::SeriesIndexIsNaN((*value).clone()))
+                        },
+                        None => return Err(ParseError::NoSeriesIndex)
+                    }
+                    let _ = iterator.next();
+                },
+                "-t" | "--template" => {
+                    match iterator.peek() {
+                        Some(value) => arguments.template = tokenizer::tokenize_template(value),
+                        None        => return Err(ParseError::NoTemplate)
+                    }
+                    let _ = iterator.next();
+                },
+                "-p" | "--pad-length" => {
+                    match iterator.peek() {
+                        Some(value) => match value.parse::<usize>().ok() {
+                            Some(value) => arguments.pad_length = value,
+                            None        => return Err(ParseError::PadLengthIsNaN((*value).clone()))
+                        },
+                        None => return Err(ParseError::NoPadLength)
+                    }
+                },
+                "-v" | "--verbose" => arguments.verbose = true,
+                _ => return Err(ParseError::InvalidArgument(argument.clone()))
+            }
+        } else if arguments.base_directory.is_empty() {
+            arguments.base_directory = argument.clone();
+        } else {
+            return Err(ParseError::TooManyArguments(argument.clone()));
+        }
+    }
+
+    // Set to current working directory if no directory argument is given.
+    if arguments.base_directory.is_empty() {
+        match env::current_dir() {
+            Ok(directory) => match directory.to_str() {
+                Some(directory) => arguments.base_directory = directory.to_owned(),
+                None            => return Err(ParseError::CWDNotValid)
+            },
+            Err(_) => return Err(ParseError::NoCWD)
+        }
+    }
+
+    // If no series name was given, set the series name to the base directory
+    if arguments.series_name.is_empty() {
+        arguments.series_name = String::from(Path::new(&arguments.base_directory)
+            .file_name().unwrap().to_str().unwrap());
+    }
+
+    Ok(())
 }

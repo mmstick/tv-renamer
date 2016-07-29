@@ -15,4 +15,4 @@ script:
     - export PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
     - export LD_LIBRARY_PATH="$HOME/local/lib/"
     # Build the application
-    - cargo build --verbose --features "enable_gtk"
+    - cargo build --verbose

@@ -9,46 +9,10 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkPopoverMenu" id="preferences_popover">
+  <object class="GtkImage" id="image1">
+    <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <child>
-      <object class="GtkBox">
-        <property name="visible">True</property>
-        <property name="can_focus">False</property>
-        <property name="orientation">vertical</property>
-        <child>
-          <object class="GtkCheckButton" id="automatic_button">
-            <property name="label" translatable="yes">Automatic</property>
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="receives_default">False</property>
-            <property name="draw_indicator">True</property>
-          </object>
-          <packing>
-            <property name="expand">True</property>
-            <property name="fill">True</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkCheckButton" id="logging_button">
-            <property name="label" translatable="yes">Logging</property>
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="receives_default">False</property>
-            <property name="draw_indicator">True</property>
-          </object>
-          <packing>
-            <property name="expand">True</property>
-            <property name="fill">True</property>
-            <property name="position">1</property>
-          </packing>
-        </child>
-      </object>
-      <packing>
-        <property name="submenu">main</property>
-      </packing>
-    </child>
+    <property name="stock">gtk-refresh</property>
   </object>
   <object class="GtkAdjustment" id="season_adjustment">
     <property name="lower">1</property>
@@ -140,7 +104,6 @@
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
-            <property name="padding">5</property>
             <property name="position">0</property>
           </packing>
         </child>
@@ -496,34 +459,12 @@ ${TVDB_Title} = Title of Episode from TVDB</property>
         <property name="title">TV Series Renamer</property>
         <property name="show_close_button">True</property>
         <child>
-          <object class="GtkMenuButton" id="preferences_button">
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="receives_default">True</property>
-            <property name="tooltip_text" translatable="yes">Prefences</property>
-            <property name="popover">preferences_popover</property>
-            <child>
-              <object class="GtkImage">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="stock">gtk-preferences</property>
-              </object>
-            </child>
-          </object>
-        </child>
-        <child>
           <object class="GtkButton" id="preview_button">
+            <property name="label" translatable="yes">Preview</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="receives_default">True</property>
-            <child>
-              <object class="GtkImage">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="tooltip_text" translatable="yes">Preview Changes</property>
-                <property name="stock">gtk-find</property>
-              </object>
-            </child>
+            <property name="image">image1</property>
           </object>
           <packing>
             <property name="position">1</property>

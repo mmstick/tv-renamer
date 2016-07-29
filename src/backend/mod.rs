@@ -1,117 +1,30 @@
-use std::env;
-use std::ffi::OsStr;
-use std::fs;
-use std::path::{Path, PathBuf};
-
-pub mod logging;
 pub mod traits;
 pub mod tokenizer;
 mod mimetypes;
 
-use self::traits::Digits;
-use self::tokenizer::TemplateToken as Token;
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use tvdb;
 
-#[derive(Clone, Debug)]
+use self::tokenizer::TemplateToken as Token;
+use self::traits::Digits;
+
 pub struct Arguments {
-    // Automatically infer the name of a series and season number by the directory structure.
-    pub automatic: bool,
-
-    // Print the changes that would have been made without actually making any changes.
     pub dry_run: bool,
-
-    // Log the changes that were made to the disk.
-    pub log_changes: bool,
-
-    // Print all changes that are being attempted and performed.
     pub verbose: bool,
-
-    // Contains the base directory of the series to rename.
-    pub directory: String,
-
-    // Contains the name of the series to be renamed.
+    pub base_directory: String,
     pub series_name: String,
-
-    // Contains the season number to add to the filename and for use with TVDB lookups.
-    pub season_number: usize,
-
-    // The starting episode index count to start renaming from.
-    pub episode_count: usize,
-
-    // The number of zeros to use when padding episode numbers.
+    pub season_index: usize,
+    pub episode_index: usize,
     pub pad_length: usize,
-
-    // The template used for setting the naming scheme of episodes.
     pub template: Vec<Token>
 }
 
-impl Arguments {
-    /// Given a source of episodes from a directory, this returns a list of their target paths.
-    pub fn get_targets(&self, directory: &str, episodes: &[PathBuf], episode_index: usize) -> Result<Vec<PathBuf>, String> {
-        // The API key required by TVDB's API.
-        let api = tvdb::Tvdb::new("0629B785CE550C8D");
-        // Obtain the TVDB series information if the template contains the TVDB token.
-        let series_info = if self.template.contains(&Token::TVDB) {
-            match api.search(self.series_name.as_str(), "en") {
-                Ok(reply) => Some(reply),
-                Err(_)    => { return Err(String::from("unable to get TVDB series information")); }
-            }
-        } else {
-            None
-        };
-
-        let mut output: Vec<PathBuf> = Vec::new();
-        let mut current_index = episode_index;
-        for file in episodes {
-            // Obtain the TVDB Title if the template contains the TVDB token.
-            let tvdb_title = if self.template.contains(&Token::TVDB) {
-                let reply = series_info.clone().unwrap();
-                match api.episode(&reply[0], self.season_number as u32, current_index as u32) {
-                    Ok(episode) => episode.episode_name,
-                    Err(_)      => { return Err(format!("episode '{}' does not exist", file.to_string_lossy())); }
-                }
-            } else {
-                String::new()
-            };
-
-            // Get target destination for the current file.
-            let new_destination = self.get_destination(Path::new(directory), file, current_index, &tvdb_title);
-            output.push(new_destination);
-            current_index += 1;
-        }
-        Ok(output)
-    }
-
-    /// Obtain the target path of the file based on the episode count
-    pub fn get_destination(&self, directory: &Path, file: &Path, episode: usize, title: &str) -> PathBuf {
-        let mut destination = String::from(directory.to_str().unwrap());
-        destination.push('/');
-
-        let mut filename = String::new();
-        for pattern in self.template.clone() {
-            match pattern {
-                Token::Character(value) => filename.push(value),
-                Token::Series           => filename.push_str(self.series_name.clone().as_str()),
-                Token::Season           => filename.push_str(self.season_number.to_string().as_str()),
-                Token::Episode          => filename.push_str(episode.to_padded_string('0', self.pad_length).as_str()),
-                Token::TVDB             => filename.push_str(title)
-            }
-        }
-        filename = String::from(filename.trim()); // Remove extra spaces
-        filename = filename.replace("/", "-");     // Remove characters that are invalid in pathnames
-
-        // Append the extension
-        let extension = file.extension().unwrap_or_else(|| OsStr::new("")).to_str().unwrap_or("");
-        if !extension.is_empty() {
-            filename.push('.');
-            filename.push_str(extension);
-        }
-
-        // Return the path as a PathBuf
-        destination.push_str(&filename);
-        PathBuf::from(destination)
-    }
+pub struct Season {
+    pub season_no: usize,
+    pub episodes:  Vec<PathBuf>
 }
 
 /// Takes a pathname and shortens it for readability.
@@ -126,6 +39,151 @@ pub fn shorten_path(path: &Path) -> PathBuf {
             .map_or_else(|| path.to_path_buf(), |value| PathBuf::from("~").join(value)))
 }
 
+pub enum ScanDir {
+    Episodes(Season),
+    Seasons(Vec<Season>)
+}
+
+pub enum ReadDirError {
+    UnableToReadDir,
+    InvalidDirEntry,
+    MimeFileErr,
+    MimeStringErr,
+}
+
+/// Scans a given directory to determine whether the directory contains seasons or episodes, and returns a result
+/// that matches the situation.
+pub fn scan_directory<P: AsRef<Path> + Copy>(directory: P, season_no: usize) -> Result<ScanDir, ReadDirError> {
+    // Attempt to determine whether the input directory contains seasons, episodes, or has invalid file entries
+    let status = fs::read_dir(directory).ok().map_or(Err(ReadDirError::UnableToReadDir), |entries| {
+        for entry in entries {
+            match entry.map(|entry| entry.path()).ok() {
+                None => return Err(ReadDirError::InvalidDirEntry),
+                Some(directory) => {
+                    if directory.is_dir() && directory.to_str().unwrap().to_lowercase().contains("season") {
+                        return Ok(true)
+                    }
+                }
+            }
+        }
+        Ok(false)
+    });
+
+    match status {
+        // If the directory contains season folders, return a list of seasons.
+        Ok(true)  => get_seasons(directory).map(ScanDir::Seasons),
+        // If the directory does not contain season folders, return a list of episodes
+        Ok(false) => get_episodes(directory, season_no).map(ScanDir::Episodes),
+        // If an error occurred, return the error
+        Err(why)  => Err(why)
+    }
+}
+
+pub enum TargetErr {
+    TvdbSeriesLookupFailed,
+    TvdbEpisodeDoesNotExist
+}
+
+// Target requires source path, template tokens, episode number, and name of TV series
+pub fn collect_target(source: &Path, season_no: usize, episode_no: usize, series_name: &str, template: &[Token], pad_length: usize)
+    -> Result<PathBuf, TargetErr>
+{
+    let mut filename = String::with_capacity(64);
+    for pattern in template {
+        match *pattern {
+            Token::Character(value) => filename.push(value),
+            Token::Series           => filename.push_str(series_name),
+            Token::Season           => filename.push_str(season_no.to_string().as_str()),
+            Token::Episode          => filename.push_str(episode_no.to_padded_string('0', pad_length).as_str()),
+            Token::TVDB             => {
+                match get_tvdb_title(series_name, season_no, episode_no) {
+                    Ok(title) => filename.push_str(title.as_str()),
+                    Err(why)  => return Err(why)
+                }
+            }
+        }
+    }
+
+    filename = filename.trim().replace("/", "-") + "." + &source.extension().unwrap().to_str().unwrap();
+    Ok(PathBuf::from(source.parent().unwrap()).join(filename))
+}
+
+/// Obtains the title of the episode from the TVDB.
+fn get_tvdb_title(series: &str, season_no: usize, episode_no: usize) -> Result<String, TargetErr> {
+    let api = tvdb::Tvdb::new("0629B785CE550C8D");
+    let series_id = match api.search(series, "en") {
+        Ok(result) => result[0].seriesid,
+        Err(_)     => return Err(TargetErr::TvdbSeriesLookupFailed)
+    };
+
+    match api.episode(series_id, season_no as u32, episode_no as u32) {
+        Ok(episode) => Ok(episode.episode_name),
+        Err(_)      => Err(TargetErr::TvdbEpisodeDoesNotExist)
+    }
+}
+
+/// Collects a list of all episodes belonging to each season within a given directory.
+fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError> {
+    // First, collect a list of season paths
+    let entries = fs::read_dir(directory).unwrap();
+    let mut seasons = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => if entry.path().is_dir() { seasons.push(entry.path()); },
+            Err(_)    => return Err(ReadDirError::InvalidDirEntry)
+        }
+    }
+    seasons.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
+
+    // Then, collect all of the episodes that belong to each season, numbering them accordingly to their name.
+    let mut output: Vec<Season> = Vec::new();
+    for season in seasons {
+        if let Some(number) = derive_season_number(&season) {
+            match get_episodes(&season, number) {
+                Err(why)   => return Err(why),
+                Ok(season) => output.push(season)
+            }
+        }
+    }
+    Ok(output)
+}
+
+
+/// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
+fn get_episodes<P: AsRef<Path>>(directory: P, season_no: usize) -> Result<Season, ReadDirError> {
+    // Collect a list of video extensions
+    let video_extensions = match mimetypes::get_video_extensions() {
+        Err(mimetypes::MimeError::OpenFile)         => return Err(ReadDirError::MimeFileErr),
+        Err(mimetypes::MimeError::ReadFileToString) => return Err(ReadDirError::MimeStringErr),
+        Ok(extensions)                              => extensions
+    };
+
+    // Collect a list of episodes in the directory
+    let mut episodes = Vec::with_capacity(32);
+    let entries = fs::read_dir(directory).unwrap();
+    for entry in entries {
+        let status = entry.ok().map_or(Some(ReadDirError::InvalidDirEntry), |entry| {
+            let path = entry.path();
+            if path.is_file() {
+                // Only collect videos from a list of known supported video extensions.
+                for extension in &video_extensions {
+                    // Only collect files that contain extensions
+                    path.extension().map(|entry| {
+                        // If the video extension matches the current file, append it to the list of episodes.
+                        if extension.as_str() == entry.to_str().unwrap() { episodes.push(path.clone()); }
+                    });
+                }
+            }
+            None
+        });
+        if status.is_some() { return Err(status.unwrap()); }
+    }
+    episodes.sort_by(|a, b| a.to_string_lossy().to_lowercase().cmp(&b.to_string_lossy().to_lowercase()));
+
+    // Return the list of episodes as a `Season` with the accompanying season number.
+    Ok(Season { season_no: season_no, episodes: episodes })
+}
+
 /// Given a directory path, derive the number of the season and assign it.
 pub fn derive_season_number(season: &Path) -> Option<usize> {
     let mut directory_name = season.file_name().unwrap().to_str().unwrap().to_lowercase();
@@ -137,49 +195,6 @@ pub fn derive_season_number(season: &Path) -> Option<usize> {
             directory_name.parse::<usize>().ok()
         }
     }
-}
-
-/// Collects a list of all of the seasons in a given directory.
-pub fn get_seasons(directory: &str) -> Result<Vec<PathBuf>, &str> {
-    fs::read_dir(directory).ok().map_or(Err("unable to read directory"), |files| {
-        let mut seasons = Vec::new();
-        for entry in files {
-            let status = entry.ok().map_or(Some("tv-renamer: unable to get directory entry"), |entry| {
-                entry.metadata().ok().map_or(Some("tv-renamer: unable to get metadata"), |metadata| {
-                    if metadata.is_dir() { seasons.push(entry.path()); }
-                    None
-                })
-            });
-            if status.is_some() { return Err(status.unwrap()); }
-        }
-        seasons.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
-        Ok(seasons)
-    })
-}
-
-/// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
-pub fn get_episodes(directory: &str) -> Result<Vec<PathBuf>, &str> {
-    fs::read_dir(directory).ok().map_or(Err("tv-renamer: unable to read file"), |files| {
-        let video_extensions = try!(mimetypes::get_video_extensions());
-        let mut episodes = Vec::new();
-        for entry in files {
-            let status = entry.ok().map_or(Some("tv-renamer: unable to get file entry"), |entry| {
-                entry.metadata().ok().map_or(Some("tv-renamer: unable to get metadata"), |metadata| {
-                    if metadata.is_file() {
-                        for extension in &video_extensions {
-                            if extension.as_str() == entry.path().extension().unwrap().to_str().unwrap() {
-                                episodes.push(entry.path());
-                            }
-                        }
-                    }
-                    None
-                })
-            });
-            if status.is_some() { return Err(status.unwrap()); }
-        }
-        episodes.sort_by(|a, b| a.to_string_lossy().to_lowercase().cmp(&b.to_string_lossy().to_lowercase()));
-        Ok(episodes)
-    })
 }
 
 #[test]

@@ -2,29 +2,19 @@
 
 # Features
 
-- Written safely in Rust!
-- Detection of video content only via /etc/mime.types
-- Templates to customizing naming schemes
+- Written safely in the Rust programming language
+- Features both a command-line and GTK3 interface
+- Support for Templates to define custom naming schemes
 - TVDB Support for obtaining episode titles from TheTVDB
-- Automatically inferring series titles based on directory path
-- Ability to rename multiple seasons and specials
-- CLI and GTK3 interfaces
-- Busybox-style binary
+- Automatically infers whether the input directory contains seasons or episodes
+- Only renames videos whose extensions can be found in /etc/mime.types
 
 # Installation Instructions
 
-This project is using a Makefile for generating a busybox-style binary, named **tv-renamer**, which provides two options: **cli** and **gtk**. Ensure that you have a modern stable version of Rust installed via [rustup](https://www.rustup.rs/). If you are packaging for Debian, ensure that you have [cargo deb](https://github.com/mmstick/cargo-deb) installed. The default make option will build the binary with the GTK3 interface feature enabled. To build without the GTK3 interface, use `make cli` instead of `make`.
-
-## With GTK3 Enabled
+This project is using a Makefile for generating a busybox-style binary, named **tv-renamer**, which provides two options: **cli** and **gtk**. Ensure that you have a modern stable version of Rust installed via [rustup](https://www.rustup.rs/). If you are packaging for Debian, ensure that you have [cargo deb](https://github.com/mmstick/cargo-deb) installed.
 
 ```sh
-make && sudo make install-gtk3
-```
-
-## CLI-only
-
-```sh
-make cli && sudo make install-cli
+make && sudo make install
 ```
 
 # GTK3 Manual
@@ -37,24 +27,16 @@ The use of this application should be fairly straightforward. The program uses t
   - This will be automatically inferred from the directory path if no name is set.
 
 
-- **Season Directory**:
-  - If **Automatic** is enabled, set this to the base directory of the TV series.
-  - Otherwise, set this to the season directory that you are currently renaming.
+- **Season Directory**: The location of the base directory where the season folders or episodes are stored.
 
 
 - **Template**: Defines the naming scheme to use when renaming episodes.
 
 
 - **Season Number** and **Episode Number**: Defines what index to start counting from.
-  - These are ignored when **Automatic** is enabled.
 
 
-- **Log Changes** will simply log changes that have been performed on the disk.
-
-
-- **Automatic**: Rename all seasons within a TV series directory.
-
-The directory structure for **Automatic** should be as follows:
+The directory structure for base directories with season folders should be as follows:
 
 > Series Title/Specials/{Episodes...}
 
@@ -74,17 +56,11 @@ If you need help with the usage of the CLI application, this manual page is also
 
 ## DESCRIPTION:
 
-Renames all videos in a directory according to their season number and episode count. Please ensure that all of the files in the directory are files that you want renamed. It is recommended to use the dry-run option first before committing any changes.
-
-If no DIRECTORY is given, the default path will be the current working directory. If a target file already exists, the command will skip the file.
+Renames all videos in a directory according to their season and episode. If the given DIRECTORY contains season directories, it will automatically rename episodes in each season. If no DIRECTORY is given, the default path will be the current working directory. It is recommended to use the dry-run option first before committing any changes. If a target file already exists, the command will ask if it is okay to overwrite the file. Please ensure that all of the files in the directory are video files that you want renamed.
 
 ## OPTIONS:
 
-**-a, --automatic**: Automatically infer the season name and number based on the directory structure.
-
 **-d, --dry-run:** Runs through all of the files and prints what would happen without doing anything.
-
-**-l, --log-changes:** Log changes made to the disk to a file in your home directory.
 
 **-n, --series-name:** Sets the name of the series to be renamed. [not optional]
 
@@ -104,7 +80,7 @@ When executed inside of a directory with the name of the TV Series
 
 ```
 one.mkv two.mkv three.mkv
-> tv-renamer cli -n "series name"
+> tv-renamer -n "series name"
 "TV Series 1x01 Episode Title.mkv"
 "TV Series 1x02 Episode Title.mkv"
 "TV Series 1x03 Episode Title.mkv"
@@ -114,7 +90,7 @@ You can define your own naming scheme with --template:
 
 ```
 > one.mkv two.mkv three.mkv
-> tv-renamer cli -t "${Series} S${Season}E${Episode} - ${TVDB_Title}"
+> tv-renamer -t "${Series} S${Season}E${Episode} - ${TVDB_Title}"
 > "TV Series S1E01 - Episode Title.mkv" "TV Series S1E02 - Episode Title.mkv" "TV Series S1E03 - Episode Title.mkv"
 ```
 
@@ -122,17 +98,19 @@ The season name can also be automatically inferred:
 
 ```
 "$series/Season1" "$series/Season2"
-> tv-renamer cli "$series" -a OR cd $series && tv-renamer cli -a
+> tv-renamer "$series" OR cd $series && tv-renamer
 "TV Series/Season1/TV Series 1x01.mkv"
+"TV Series/Season1/TV Series 1x02.mkv"
 ...
 "TV Series/Season2/TV Series 2x01.mkv"
+"TV Series/Season2/TV Series 2x02.mkv"
 ...
 ```
 
 Episode titles can also be pulled from the TVDB and added to the filenames.
 
 ```
-> tv-renamer cli -a -t "${Series} ${Season}x${Episode} ${TVDB_Title}"
+> tv-renamer -t "${Series} ${Season}x${Episode} ${TVDB_Title}"
 "TV Series/Season1/TV Series 1x01 Episode Title.mkv"
 ```
 
