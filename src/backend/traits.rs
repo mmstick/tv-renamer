@@ -1,8 +1,4 @@
-use std::error::Error;
-use std::io::{self, Write};
 use std::iter;
-use std::path::Path;
-use std::process;
 
 /// A trait that adds the ability for numbers to find their digit count and to convert them to padded strings.
 pub trait Digits {
@@ -33,76 +29,6 @@ impl Digits for usize {
         } else {
             self.to_string()
         }
-    }
-}
-
-pub trait ToFilename {
-    // Returns the filename of the path as a String
-    fn to_filename(&self) -> String;
-}
-
-impl ToFilename for Path {
-    fn to_filename(&self) -> String {
-        self.components().last().unwrap().as_os_str().to_str().unwrap().to_string()
-    }
-}
-
-pub trait Try {
-    type Succ;
-
-    /// Unwrap or abort program with an exit status of 1.
-    fn try(self, message: &[u8], stderr: &mut io::Stderr) -> Self::Succ;
-}
-
-pub trait TryAndIgnore {
-    type Succ;
-
-    /// Print an error message and ignore the error.
-    fn try_and_ignore(self, message: &[u8], stderr: &mut io::Stderr) -> Self::Succ;
-}
-
-impl<T, U: Error> Try for Result<T, U> {
-    type Succ = T;
-
-    fn try(self, message: &[u8], stderr: &mut io::Stderr) -> T {
-        self.unwrap_or_else(|e| {
-            let mut stderr = stderr.lock();
-            let _ = stderr.write(b"tv-renamer: ");
-            let _ = stderr.write(message);
-            let _ = stderr.write(e.description().as_bytes());
-            let _ = stderr.write(b"\n");
-            let _ = stderr.flush();
-            process::exit(1);
-        })
-    }
-}
-
-impl<T, U: Error> TryAndIgnore for Result<T, U> {
-    type Succ = T;
-
-    fn try_and_ignore(self, message: &[u8], stderr: &mut io::Stderr) -> T {
-        self.unwrap_or_else(|_| {
-            let mut stderr = stderr.lock();
-            let _ = stderr.write(b"tv-renamer: ");
-            let _ = stderr.write(message);
-            let _ = stderr.write(b"\n");
-            let _ = stderr.flush();
-            process::exit(1);
-        })
-    }
-}
-impl<T> Try for Option<T> {
-    type Succ = T;
-
-    fn try(self, message: &[u8], stderr: &mut io::Stderr) -> T {
-        self.unwrap_or_else(|| {
-            let mut stderr = stderr.lock();
-            let _ = stderr.write(b"tv-renamer: ");
-            let _ = stderr.write(message);
-            let _ = stderr.write(b"\n");
-            let _ = stderr.flush();
-            process::exit(1);
-        })
     }
 }
 
