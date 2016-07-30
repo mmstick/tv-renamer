@@ -76,7 +76,6 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
     let stdout = &mut io::stdout();
     let mut episode_no = episode_no;
     for source in &season.episodes {
-        // Collect the target destination for the source episode to be renamed to
         match backend::collect_target(&source, season.season_no, episode_no, &arguments.series_name,
             &arguments.template, arguments.pad_length)
         {
@@ -115,9 +114,13 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
                 let _ = stderr.write(b"tv-renamer: unable to find ");
                 match why {
                     // The TV series was unable to be found on the TVDB.
-                    TargetErr::TvdbSeriesLookupFailed  => { let _ = write!(stderr, "TV series: {}\n", &arguments.series_name); },
+                    TargetErr::TvdbSeriesLookupFailed  => {
+                        let _ = write!(stderr, "TV series: {}\n", &arguments.series_name);
+                    },
                     // The episode number was unable to be found in the TV series.
-                    TargetErr::TvdbEpisodeDoesNotExist => { let _ = write!(stderr, "episode {}\n", episode_no); }
+                    TargetErr::TvdbEpisodeDoesNotExist => {
+                        let _ = write!(stderr, "episode {}\n", episode_no);
+                    }
                 }
                 process::exit(1);
             }
@@ -194,6 +197,7 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                         },
                         None => return Err(ParseError::NoPadLength)
                     }
+                    let _ = iterator.next();
                 },
                 "-v" | "--verbose" => arguments.verbose = true,
                 _ => return Err(ParseError::InvalidArgument(argument.clone()))

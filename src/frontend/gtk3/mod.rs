@@ -66,9 +66,10 @@ pub fn interface() {
     preview_tree.set_model(Some(&preview_list));
     preview_tree.set_headers_visible(true);
 
-    // A simple macro that is shared among all widgets that trigger the action to update the preview.
-    macro_rules! gtk_preview {
-        ($widget:ident) => {{
+    // A simple macro that is shared among all widgets that trigger the action to either
+    // update the preview or rename the TV series.
+    macro_rules! rename_action {
+        ($widget:ident, $dry_run:ident, $dialog:ident) => {{
             let $widget             = $widget.clone();
             let season_spin_button  = season_spin_button.clone();
             let episode_spin_button = episode_spin_button.clone();
@@ -79,16 +80,31 @@ pub fn interface() {
             let notification_label  = notification_label.clone();
             let template_entry      = template_entry.clone();
             $widget.connect_clicked(move |_| {
+                if $dialog {
+                    // Open file chooser dialog to modify series_directory_entry.
+                    let dialog = FileChooserDialog::new (
+                        Some("Choose Directory"),
+                        Some(&Window::new(WindowType::Popup)),
+                        gtk::FileChooserAction::SelectFolder,
+                    );
+                    dialog.add_button("Cancel", gtk::ResponseType::Cancel.into());
+                    dialog.add_button("Select", gtk::ResponseType::Ok.into());
+
+                    if dialog.run() == gtk::ResponseType::Ok.into() {
+                        dialog.get_filename().map(|path| path.to_str().map(|text| directory_entry.set_text(text)));
+                    }
+                    dialog.destroy();
+                }
                 if let Some(directory) = directory_entry.get_text() {
                     let mut program = &mut Arguments {
-                        dry_run:       true,
-                        verbose:       false,
-                        base_directory:     parse_directory(&directory),
-                        series_name:   series_entry.get_text().unwrap_or_default(),
-                        season_index: season_spin_button.get_value_as_int() as usize,
-                        episode_index: episode_spin_button.get_value_as_int() as usize,
-                        pad_length:    2,
-                        template:      tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
+                        dry_run:        $dry_run,
+                        verbose:        false,
+                        base_directory: parse_directory(&directory),
+                        series_name:    series_entry.get_text().unwrap_or_default(),
+                        season_index:   season_spin_button.get_value_as_int() as usize,
+                        episode_index:  episode_spin_button.get_value_as_int() as usize,
+                        pad_length:     2,
+                        template:       tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
                     };
 
                     if program.series_name.is_empty() {
@@ -105,99 +121,15 @@ pub fn interface() {
         }}
     }
 
-    // All of the widgets that implement the update preview action
-    gtk_preview!(preview_button);
+    // All of the widgets that implement the rename action.
+    rename_action!(preview_button, true, false);
+    rename_action!(series_directory_button, true, true);
+    rename_action!(rename_button, false, false);
 
     { // Hide the Info Bar when the Info Bar is closed
         let info_bar = info_bar.clone();
         info_button.connect_clicked(move |_| {
             info_bar.hide();
-        });
-    }
-
-
-    { // NOTE: Programs the Choose Directory button with a File Chooser Dialog.
-        let season_spin_button  = season_spin_button.clone();
-        let episode_spin_button = episode_spin_button.clone();
-        let series_entry        = series_name_entry.clone();
-        let directory_entry     = series_directory_entry.clone();
-        let preview_list        = preview_list.clone();
-        let info_bar            = info_bar.clone();
-        let notification_label  = notification_label.clone();
-        let template_entry      = template_entry.clone();
-        series_directory_button.connect_clicked(move |_| {
-            // Open file chooser dialog to modify series_directory_entry.
-            let dialog = FileChooserDialog::new (
-                Some("Choose Directory"),
-                Some(&Window::new(WindowType::Popup)),
-                gtk::FileChooserAction::SelectFolder,
-            );
-            dialog.add_button("Cancel", gtk::ResponseType::Cancel.into());
-            dialog.add_button("Select", gtk::ResponseType::Ok.into());
-
-            if dialog.run() == gtk::ResponseType::Ok.into() {
-                dialog.get_filename().map(|path| path.to_str().map(|text| directory_entry.set_text(text)));
-            }
-            dialog.destroy();
-
-            if let Some(directory) = directory_entry.get_text() {
-                let mut program = &mut Arguments {
-                    dry_run:        true,
-                    verbose:        false,
-                    base_directory: parse_directory(&directory),
-                    series_name:    series_entry.get_text().unwrap_or_default(),
-                    season_index:   season_spin_button.get_value_as_int() as usize,
-                    episode_index:  episode_spin_button.get_value_as_int() as usize,
-                    pad_length:     2,
-                    template:       tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
-                };
-
-                if program.series_name.is_empty() {
-                    program.series_name = String::from(Path::new(&program.base_directory)
-                        .file_name().unwrap().to_str().unwrap());
-                    series_entry.set_text(program.series_name.as_str());
-                }
-
-                if !program.base_directory.is_empty() {
-                    rename_series(&program, &preview_list, &info_bar, &notification_label);
-                }
-            }
-        });
-    }
-
-    { // NOTE: Controls what happens when rename button is pressed
-        let button              = rename_button.clone();
-        let season_spin_button  = season_spin_button.clone();
-        let episode_spin_button = episode_spin_button.clone();
-        let series_entry        = series_name_entry.clone();
-        let directory_entry     = series_directory_entry.clone();
-        let preview_list        = preview_list.clone();
-        let info_bar            = info_bar.clone();
-        let notification_label  = notification_label.clone();
-        let template_entry      = template_entry.clone();
-        button.connect_clicked(move |_| {
-            if let Some(directory) = directory_entry.get_text() {
-                let mut program = &mut Arguments {
-                    dry_run:        false,
-                    verbose:        false,
-                    base_directory: parse_directory(&directory),
-                    series_name:    series_entry.get_text().unwrap_or_default(),
-                    season_index:   season_spin_button.get_value_as_int() as usize,
-                    episode_index:  episode_spin_button.get_value_as_int() as usize,
-                    pad_length:     2,
-                    template:       tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
-                };
-
-                if program.series_name.is_empty() {
-                    program.series_name = String::from(Path::new(&program.base_directory)
-                        .file_name().unwrap().to_str().unwrap());
-                    series_entry.set_text(program.series_name.as_str());
-                }
-
-                if !program.base_directory.is_empty() {
-                    rename_series(&program, &preview_list, &info_bar, &notification_label);
-                }
-            }
         });
     }
 
@@ -220,7 +152,7 @@ pub fn interface() {
     gtk::main();
 }
 
-// Attempt to rename all of the seasons within a given series
+/// Attempt to rename all of the seasons within a given series
 fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::InfoBar, notification_label: &gtk::Label) {
     preview_list.clear();
     match backend::scan_directory(&args.base_directory, args.season_index) {
@@ -231,24 +163,9 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
                     info_bar.set_message_type(gtk::MessageType::Info);
                     notification_label.set_text("Rename Success");
                 },
-                Err(RenameErr::TargetExists(path)) => {
-                    info_bar.set_message_type(gtk::MessageType::Error);
-                    notification_label.set_text(format!("{:?} already exists", path).as_str());
-                },
-                Err(RenameErr::RenameFailed(source, target)) => {
-                    info_bar.set_message_type(gtk::MessageType::Error);
-                    notification_label.set_text(format!("Could not rename {:?} to {:?}", source, target).as_str());
-                },
-                Err(RenameErr::TvdbEpisodeDoesNotExist(episode)) => {
-                    info_bar.set_message_type(gtk::MessageType::Error);
-                    notification_label.set_text(format!("Episode {} could not be found on TheTVDB", episode).as_str());
-                },
-                Err(RenameErr::TvdbSeriesLookupFailed) => {
-                    info_bar.set_message_type(gtk::MessageType::Error);
-                    notification_label.set_text(format!("{} could not be found on TheTVDB", &args.series_name).as_str());
-                }
+                Err(why) => match_rename_error(info_bar, notification_label, why, args)
             }
-        }
+        },
         Ok(ScanDir::Seasons(seasons))  => {
             for season in seasons {
                 match rename_season(&season, 1, args, preview_list) {
@@ -257,29 +174,13 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
                         info_bar.set_message_type(gtk::MessageType::Info);
                         notification_label.set_text("Rename Success");
                     },
-                    Err(RenameErr::TargetExists(path)) => {
-                        info_bar.set_message_type(gtk::MessageType::Error);
-                        notification_label.set_text(format!("{:?} already exists", path).as_str());
-                        break
-                    },
-                    Err(RenameErr::RenameFailed(source, target)) => {
-                        info_bar.set_message_type(gtk::MessageType::Error);
-                        notification_label.set_text(format!("Could not rename {:?} to {:?}", source, target).as_str());
-                        break
-                    }
-                    Err(RenameErr::TvdbEpisodeDoesNotExist(episode)) => {
-                        info_bar.set_message_type(gtk::MessageType::Error);
-                        notification_label.set_text(format!("Episode {} could not be found on TheTVDB", episode).as_str());
-                        break
-                    },
-                    Err(RenameErr::TvdbSeriesLookupFailed) => {
-                        info_bar.set_message_type(gtk::MessageType::Error);
-                        notification_label.set_text(format!("{} could not be found on TheTVDB", &args.series_name).as_str());
+                    Err(why) => {
+                        match_rename_error(info_bar, notification_label, why, args);
                         break
                     }
                 }
             }
-        }
+        },
         Err(why) => {
             info_bar.set_message_type(gtk::MessageType::Error);
             notification_label.set_text(match why {
@@ -291,6 +192,18 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
         }
     }
     info_bar.show();
+}
+
+/// If a rename error occurs, write the message to the `InfoBar`.
+fn match_rename_error(info_bar: &gtk::InfoBar, notification_label: &gtk::Label, why: RenameErr, args: &Arguments) {
+    info_bar.set_message_type(gtk::MessageType::Error);
+    let message = match why {
+        RenameErr::RenameFailed(source, target)     => format!("Could not rename {:?} to {:?}", source, target),
+        RenameErr::TargetExists(path)               => format!("{:?} already exists", path),
+        RenameErr::TvdbEpisodeDoesNotExist(episode) => format!("Episode {} could not be found on TheTVDB", episode),
+        RenameErr::TvdbSeriesLookupFailed           => format!("{} could not be found on TheTVDB", &args.series_name)
+    };
+    notification_label.set_text(message.as_str());
 }
 
 enum RenameErr {
@@ -307,17 +220,17 @@ fn rename_season(season: &Season, episode_no: usize, arguments: &Arguments, prev
 {
     let mut episode_no = episode_no;
     for source in &season.episodes {
-        // Collect the target directory to rename the source episode to.
         match backend::collect_target(&source, season.season_no, episode_no, &arguments.series_name,
             &arguments.template, arguments.pad_length)
         {
             Ok(target) => {
-                // If the target exists, do not overwrite
                 if target.exists() { return Err(RenameErr::TargetExists(source.clone())); }
-                // Upadte the preview list
+
+                // Update the preview list
                 let src = source.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
                 let trg = target.components().last().unwrap().as_os_str().to_str().unwrap().to_string();
                 preview_list.insert_with_values(None, &[0, 1], &[&src, &trg]);
+
                 // If dry_run is enabled, do not attempt to rename the episode
                 if !arguments.dry_run {
                     if let Err(_) = fs::rename(&source, &target) {
