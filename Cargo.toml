@@ -1,6 +1,6 @@
 [package]
 name = "tv-renamer"
-version = "0.3.1"
+version = "0.3.2"
 license = "MIT"
 authors = ["Michael Aaron Murphy <mmstickman@gmail.com>"]
 description = "TV renaming application with TVDB titles and templating support"

@@ -14,6 +14,7 @@ use self::traits::Digits;
 pub struct Arguments {
     pub dry_run: bool,
     pub verbose: bool,
+    // pub overview: bool,
     pub base_directory: String,
     pub series_name: String,
     pub season_index: usize,
@@ -80,46 +81,38 @@ pub fn scan_directory<P: AsRef<Path> + Copy>(directory: P, season_no: usize) -> 
 }
 
 pub enum TargetErr {
-    TvdbSeriesLookupFailed,
-    TvdbEpisodeDoesNotExist
+    EpisodeDoesNotExist
 }
 
-// Target requires source path, template tokens, episode number, and name of TV series
-pub fn collect_target(source: &Path, season_no: usize, episode_no: usize, series_name: &str, template: &[Token], pad_length: usize)
-    -> Result<PathBuf, TargetErr>
+/// Target requires source path, template tokens, episode number, and name of TV series
+pub fn collect_target(source: &Path, season_no: usize, episode_no: usize, arguments: &Arguments,
+    tvdb_api: &tvdb::Tvdb, tvdb_series_id: u32)-> Result<PathBuf, TargetErr>
 {
+    let episode = match tvdb_api.episode(tvdb_series_id, season_no as u32, episode_no as u32) {
+        Ok(episode) => episode,
+        Err(_)      => return Err(TargetErr::EpisodeDoesNotExist)
+    };
+
     let mut filename = String::with_capacity(64);
-    for pattern in template {
+    for pattern in &arguments.template {
         match *pattern {
             Token::Character(value) => filename.push(value),
-            Token::Series           => filename.push_str(series_name),
-            Token::Season           => filename.push_str(season_no.to_string().as_str()),
-            Token::Episode          => filename.push_str(episode_no.to_padded_string('0', pad_length).as_str()),
-            Token::TVDB             => {
-                match get_tvdb_title(series_name, season_no, episode_no) {
-                    Ok(title) => filename.push_str(title.as_str()),
-                    Err(why)  => return Err(why)
-                }
+            Token::Series           => filename.push_str(&arguments.series_name),
+            Token::Season           => filename.push_str(&season_no.to_string()),
+            Token::Episode          => filename.push_str(&episode_no.to_padded_string('0', arguments.pad_length)),
+            Token::TvdbTitle        => filename.push_str(&episode.episode_name),
+            Token::TvdbFirstAired   => if let Some(date) = episode.first_aired.clone() {
+                filename.push_str(&date.year.to_string());
+                filename.push('-');
+                filename.push_str(&date.month.to_padded_string('0', 2));
+                filename.push('-');
+                filename.push_str(&date.day.to_padded_string('0', 2));
             }
         }
     }
 
-    filename = filename.trim().replace("/", "-") + "." + &source.extension().unwrap().to_str().unwrap();
+    filename = filename.trim().replace("/", "-") + "." + source.extension().unwrap().to_str().unwrap();
     Ok(PathBuf::from(source.parent().unwrap()).join(filename))
-}
-
-/// Obtains the title of the episode from the TVDB.
-fn get_tvdb_title(series: &str, season_no: usize, episode_no: usize) -> Result<String, TargetErr> {
-    let api = tvdb::Tvdb::new("0629B785CE550C8D");
-    let series_id = match api.search(series, "en") {
-        Ok(result) => result[0].seriesid,
-        Err(_)     => return Err(TargetErr::TvdbSeriesLookupFailed)
-    };
-
-    match api.episode(series_id, season_no as u32, episode_no as u32) {
-        Ok(episode) => Ok(episode.episode_name),
-        Err(_)      => Err(TargetErr::TvdbEpisodeDoesNotExist)
-    }
 }
 
 /// Collects a list of all episodes belonging to each season within a given directory.

@@ -1,5 +1,13 @@
 #[derive(Clone, Debug, PartialEq)]
-pub enum TemplateToken { Character(char), Series, Season, Episode, TVDB }
+pub enum TemplateToken {
+    Character(char),
+    Series,
+    Season,
+    Episode,
+    TvdbTitle,
+    TvdbFirstAired,
+
+}
 
 // The default template signature is `${SERIES} ${SEASON}x${EPISODE} ${TITLE}`
 pub fn default_template() -> Vec<TemplateToken> {
@@ -13,7 +21,7 @@ pub fn default_template() -> Vec<TemplateToken> {
          TemplateToken::Character(' '),
          TemplateToken::Character('-'),
          TemplateToken::Character(' '),
-         TemplateToken::TVDB]
+         TemplateToken::TvdbTitle]
 }
 
 /// This tokenizer will take the template string as input and convert it into an ordered vector of tokens.
@@ -72,11 +80,12 @@ pub fn tokenize_template(template: &str) -> Vec<TemplateToken> {
 /// Given a pattern, this function will attempt to match the pattern to a predefined token.
 fn match_token(pattern: &str) -> Option<TemplateToken> {
     match pattern {
-        "${Series}"     => Some(TemplateToken::Series),
-        "${Season}"     => Some(TemplateToken::Season),
-        "${Episode}"    => Some(TemplateToken::Episode),
-        "${TVDB_Title}" => Some(TemplateToken::TVDB),
-        _               => None
+        "${Series}"           => Some(TemplateToken::Series),
+        "${Season}"           => Some(TemplateToken::Season),
+        "${Episode}"          => Some(TemplateToken::Episode),
+        "${TVDB_Title}"       => Some(TemplateToken::TvdbTitle),
+        "${TVDB_First_Aired}" => Some(TemplateToken::TvdbFirstAired),
+        _                     => None
     }
 }
 
@@ -90,6 +99,7 @@ fn test_match_token() {
     assert_eq!(Some(TemplateToken::Series), match_token("${Series}"));
     assert_eq!(Some(TemplateToken::Season), match_token("${Season}"));
     assert_eq!(Some(TemplateToken::Episode), match_token("${Episode}"));
-    assert_eq!(Some(TemplateToken::TVDB), match_token("${TVDB_Title}"));
+    assert_eq!(Some(TemplateToken::TvdbTitle), match_token("${TVDB_Title}"));
+    assert_eq!(Some(TemplateToken::TvdbFirstAired), match_token("${TVDB_First_Aired}"));
     assert_eq!(None, match_token("${invalid}"));
 }

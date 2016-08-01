@@ -74,6 +74,13 @@ Renames all videos in a directory according to their season and episode. If the 
 
 **-v, --verbose:** Print the changes that are occurring.
 
+### Template Tokens:
+  - **${Series}**: Name of the TV Series
+  - **${Season}**: Season of the TV Series
+  - **${Episode}**: Current Episode Number
+  - **${TVDB_Title}**: Title of the current episode from TVDB
+  - **${TVDB_First_Aired}**: The first airing date of the episode from TVDB
+
 ## EXAMPLE:
 
 When executed inside of a directory with the name of the TV Series

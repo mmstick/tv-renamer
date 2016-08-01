@@ -267,7 +267,8 @@
 ${Series} = Name of Series
 ${Season} = Season Number
 ${Episode} = Episode Number
-${TVDB_Title} = Title of Episode from TVDB</property>
+${TVDB_Title} = Title of Episode from TVDB
+${TVDB_First_Aired} = First Airing Date of Episode from TVDB</property>
                         <property name="text" translatable="yes">${Series} - ${Season}x${Episode} - ${TVDB_Title}</property>
                       </object>
                       <packing>

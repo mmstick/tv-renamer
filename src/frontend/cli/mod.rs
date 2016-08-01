@@ -7,6 +7,7 @@ use std::io::{self, Write, Read};
 use std::fs;
 use std::path::Path;
 use std::process;
+use tvdb;
 
 const EP_NO_VAL:     &'static str = "no value was set for the episode count.\n";
 const SR_NO_VAL:     &'static str = "no value was set for the series name.\n";
@@ -75,14 +76,23 @@ pub fn interface(args: &[String]) {
 fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments, episode_no: usize) {
     let stdout = &mut io::stdout();
     let mut episode_no = episode_no;
+
+    // TVDB
+    let api = tvdb::Tvdb::new("0629B785CE550C8D");
+    let series_id = match api.search(&arguments.series_name, "en") {
+        Ok(result) => result[0].seriesid,
+        Err(_)     => {
+            let _ = write!(stderr, "TV series: {}\n", &arguments.series_name);
+            process::exit(1);
+        }
+    };
+
     for source in &season.episodes {
-        match backend::collect_target(&source, season.season_no, episode_no, &arguments.series_name,
-            &arguments.template, arguments.pad_length)
-        {
+        match backend::collect_target(source, season.season_no, episode_no, arguments, &api, series_id) {
             Ok(target) => {
                 // If the target exists, do not overwrite the target without first asking if it is OK.
                 if target.exists() {
-                    println!("tv-renamer: episode to be renamed already exists:\n{:?}Is it okay to overwrite? (y/n)", &target);
+                    println!("tv-renamer: episode to be renamed already exists:\n{:?}\nIs it okay to overwrite? (y/n)", &target);
                     let mut input = [b'n'; 1];
                     io::stdin().read_exact(&mut input).unwrap();
                     if input[0] != b'y' {
@@ -113,12 +123,8 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
             Err(why) => {
                 let _ = stderr.write(b"tv-renamer: unable to find ");
                 match why {
-                    // The TV series was unable to be found on the TVDB.
-                    TargetErr::TvdbSeriesLookupFailed  => {
-                        let _ = write!(stderr, "TV series: {}\n", &arguments.series_name);
-                    },
                     // The episode number was unable to be found in the TV series.
-                    TargetErr::TvdbEpisodeDoesNotExist => {
+                    TargetErr::EpisodeDoesNotExist => {
                         let _ = write!(stderr, "episode {}\n", episode_no);
                     }
                 }
@@ -146,7 +152,7 @@ enum ParseError {
 
 /// Parse command-line arguments and update the `arguments` structure accordingly.
 fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), ParseError> {
-    let mut iterator = args.iter().peekable();
+    let mut iterator = args.iter();
     while let Some(argument) = iterator.next() {
         if argument.starts_with('-') {
             match argument.as_str() {
@@ -156,48 +162,43 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                 }
                 "-d" | "--dry-run" => arguments.dry_run = true,
                 "-e" | "--episode-start" => {
-                    match iterator.peek() {
+                    match iterator.next() {
                         Some(value) => match value.parse::<usize>().ok() {
                             Some(value) => arguments.episode_index = value,
                             None        => return Err(ParseError::EpisodeIndexIsNaN((*value).clone()))
                         },
                         None => return Err(ParseError::NoEpisodeIndex)
                     }
-                    let _ = iterator.next();
                 },
                 "-n" | "--series-name" => {
-                    match iterator.peek() {
+                    match iterator.next() {
                         Some(value) => arguments.series_name.push_str(value),
                         None        => return Err(ParseError::NoSeriesName)
                     }
-                    let _ = iterator.next();
                 },
                 "-s" | "--season-number" => {
-                    match iterator.peek() {
+                    match iterator.next() {
                         Some(value) => match value.parse::<usize>().ok() {
                             Some(value) => arguments.season_index = value,
                             None => return Err(ParseError::SeriesIndexIsNaN((*value).clone()))
                         },
                         None => return Err(ParseError::NoSeriesIndex)
                     }
-                    let _ = iterator.next();
                 },
                 "-t" | "--template" => {
-                    match iterator.peek() {
+                    match iterator.next() {
                         Some(value) => arguments.template = tokenizer::tokenize_template(value),
                         None        => return Err(ParseError::NoTemplate)
                     }
-                    let _ = iterator.next();
                 },
                 "-p" | "--pad-length" => {
-                    match iterator.peek() {
+                    match iterator.next() {
                         Some(value) => match value.parse::<usize>().ok() {
                             Some(value) => arguments.pad_length = value,
                             None        => return Err(ParseError::PadLengthIsNaN((*value).clone()))
                         },
                         None => return Err(ParseError::NoPadLength)
                     }
-                    let _ = iterator.next();
                 },
                 "-v" | "--verbose" => arguments.verbose = true,
                 _ => return Err(ParseError::InvalidArgument(argument.clone()))
