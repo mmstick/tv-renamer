@@ -1,4 +1,4 @@
-use backend::{self, Arguments, ReadDirError, ScanDir, Season, TargetErr, tokenizer};
+use backend::{self, Arguments, ReadDirError, ScanDir, Season, tokenizer, DRY_RUN};
 
 use gdk::enums::key;
 use gtk::prelude::*;
@@ -98,12 +98,11 @@ pub fn interface() {
                 }
                 if let Some(directory) = directory_entry.get_text() {
                     let mut program = &mut Arguments {
-                        dry_run:        $dry_run,
-                        verbose:        false,
+                        flags:          if $dry_run { DRY_RUN } else { 0 },
                         base_directory: parse_directory(&directory),
                         series_name:    series_entry.get_text().unwrap_or_default(),
-                        season_index:   season_spin_button.get_value_as_int() as usize,
-                        episode_index:  episode_spin_button.get_value_as_int() as usize,
+                        season_index:   season_spin_button.get_value_as_int() as u8,
+                        episode_index:  episode_spin_button.get_value_as_int() as u16,
                         pad_length:     2,
                         template:       tokenizer::tokenize_template(template_entry.get_text().unwrap().as_str())
                     };
@@ -160,7 +159,7 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
         Ok(ScanDir::Episodes(season)) => {
             match rename_season(&season, args.episode_index, args, preview_list) {
                 Ok(_) => {
-                    if args.dry_run { return }
+                    if args.flags & DRY_RUN != 0 { return }
                     info_bar.set_message_type(gtk::MessageType::Info);
                     notification_label.set_text("Rename Success");
                 },
@@ -171,7 +170,7 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
             for season in seasons {
                 match rename_season(&season, 1, args, preview_list) {
                     Ok(_) => {
-                        if args.dry_run { return }
+                        if args.flags & DRY_RUN != 0 { return }
                         info_bar.set_message_type(gtk::MessageType::Info);
                         notification_label.set_text("Rename Success");
                     },
@@ -199,10 +198,10 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
 fn match_rename_error(info_bar: &gtk::InfoBar, notification_label: &gtk::Label, why: RenameErr, args: &Arguments) {
     info_bar.set_message_type(gtk::MessageType::Error);
     let message = match why {
-        RenameErr::RenameFailed(source, target)     => format!("Could not rename {:?} to {:?}", source, target),
-        RenameErr::TargetExists(path)               => format!("{:?} already exists", path),
-        RenameErr::EpisodeDoesNotExist(episode)     => format!("Episode {} could not be found on TheTVDB", episode),
-        RenameErr::SeriesLookupFailed               => format!("{} could not be found on TheTVDB", &args.series_name)
+        RenameErr::RenameFailed(source, target) => format!("Could not rename {:?} to {:?}", source, target),
+        RenameErr::TargetExists(path)           => format!("{:?} already exists", path),
+        RenameErr::EpisodeDoesNotExist(episode) => format!("Episode {} could not be found on TheTVDB", episode),
+        RenameErr::SeriesLookupFailed           => format!("{} could not be found on TheTVDB", &args.series_name)
     };
     notification_label.set_text(message.as_str());
 }
@@ -210,36 +209,28 @@ fn match_rename_error(info_bar: &gtk::InfoBar, notification_label: &gtk::Label, 
 enum RenameErr {
     TargetExists(PathBuf),
     RenameFailed(PathBuf, PathBuf),
-    EpisodeDoesNotExist(usize),
+    EpisodeDoesNotExist(u16),
     SeriesLookupFailed
 }
 
 /// Renames a given season and updates the preview for each episode renamed.
 /// If executed with `arguments.dry_run` set to true, the preview will be updated but the files will not be renamed.
-fn rename_season(season: &Season, episode_no: usize, arguments: &Arguments, preview_list: &ListStore)
+fn rename_season(season: &Season, episode_no: u16, arguments: &Arguments, preview_list: &ListStore)
     -> Result<(), RenameErr>
 {
     let mut episode_no = episode_no;
 
     // TVDB
     let api = tvdb::Tvdb::new("0629B785CE550C8D");
-    let series_id = match api.search(&arguments.series_name, "en") {
-        Ok(result) => result[0].seriesid,
-        Err(_)     => return Err(RenameErr::SeriesLookupFailed)
-    };
+    let series_id = api.search(&arguments.series_name, "en").map_err(|_| RenameErr::SeriesLookupFailed)?[0].seriesid;
 
     for source in &season.episodes {
-        match backend::collect_target(source, season.season_no, episode_no, arguments, &api, series_id) {
-            Ok(target) => {
-                if target.exists() { return Err(RenameErr::TargetExists(source.clone())); }
-                update_preview(preview_list, source, &target);
-                if !arguments.dry_run {
-                    if let Err(_) = fs::rename(&source, &target) {
-                        return Err(RenameErr::RenameFailed(source.clone(), target));
-                    }
-                }
-            },
-            Err(TargetErr::EpisodeDoesNotExist) => return Err(RenameErr::EpisodeDoesNotExist(episode_no)),
+        let target = backend::collect_target(source, season.season_no, episode_no, arguments, &api, series_id)
+            .map_err(|_| RenameErr::EpisodeDoesNotExist(episode_no))?;
+        if target.exists() { return Err(RenameErr::TargetExists(source.clone())); }
+        update_preview(preview_list, source, &target);
+        if arguments.flags & DRY_RUN == 0 {
+            fs::rename(&source, &target).map_err(|_| RenameErr::RenameFailed(source.clone(), target))?;
         }
         episode_no += 1;
     }

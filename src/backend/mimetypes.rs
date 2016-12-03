@@ -22,7 +22,7 @@ pub fn get_video_extensions() -> Result<Vec<String>, MimeError> {
                     // Collect all the lines that start with "video" because they contain the video extensions.
                     for item in contents.lines().filter(|x| x.starts_with("video")) {
                         // Collect the pairs of extensions associated with that video type.
-                        for extension in item.split_whitespace().skip(1).map(String::from).collect::<Vec<String>>() {
+                        for extension in item.split_whitespace().skip(1).map(String::from) {
                             // Push each of the extensions that are discovered to the list of extensions.
                             extension_list.push(extension);
                         }

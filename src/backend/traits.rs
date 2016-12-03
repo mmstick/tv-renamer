@@ -9,8 +9,8 @@ pub trait Digits {
     fn to_padded_string(&self, pad: char, limit: usize) -> String;
 }
 
-impl Digits for usize {
-    fn digits(&self) -> usize {
+impl Digits for u16 {
+    fn digits(&self) -> u16 {
         let mut digits = if *self == 1 || *self % 10 == 0 { 1 } else { 0 };
         let mut temp = 1;
         while temp < *self {
@@ -21,9 +21,9 @@ impl Digits for usize {
     }
 
     fn to_padded_string(&self, pad: char, limit: usize) -> String {
-        if self.digits() < limit {
+        if self.digits() < limit as u16 {
             let mut output = String::with_capacity(limit);
-            output.push_str(&iter::repeat(pad).take(limit - self.digits()).collect::<String>());
+            output.push_str(&iter::repeat(pad).take(limit - self.digits() as usize).collect::<String>());
             output.push_str(&self.to_string());
             output
         } else {

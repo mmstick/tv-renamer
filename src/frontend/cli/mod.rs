@@ -8,20 +8,20 @@ use std::fs;
 use std::path::Path;
 use std::process;
 use tvdb;
+use backend::{DRY_RUN, VERBOSE};
 
-const EP_NO_VAL:     &'static str = "no value was set for the episode count.\n";
-const SR_NO_VAL:     &'static str = "no value was set for the series name.\n";
-const SN_NO_VAL:     &'static str = "no value was set for the season number.\n";
-const PD_NO_VAL:     &'static str = "no value was set for the pad length.\n";
-const TMP_NO_VAL:    &'static str = "no value was set for the template.\n";
+const EP_NO_VAL: &'static str = "no value was set for the episode count.\n";
+const SR_NO_VAL: &'static str = "no value was set for the series name.\n";
+const SN_NO_VAL: &'static str = "no value was set for the season number.\n";
+const PD_NO_VAL: &'static str = "no value was set for the pad length.\n";
+const TMP_NO_VAL:&'static str = "no value was set for the template.\n";
 
 pub fn interface(args: &[String]) {
     let stderr = &mut io::stderr();
 
     // Default CLI arguments
     let mut arguments = Arguments {
-        dry_run:        false,
-        verbose:        false,
+        flags:          0,
         season_index:   1,
         episode_index:  1,
         pad_length:     2,
@@ -73,7 +73,7 @@ pub fn interface(args: &[String]) {
 }
 
 /// Renames all of the episodes in given season
-fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments, episode_no: usize) {
+fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments, episode_no: u16) {
     let stdout = &mut io::stdout();
     let mut episode_no = episode_no;
 
@@ -82,7 +82,7 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
     let series_id = match api.search(&arguments.series_name, "en") {
         Ok(result) => result[0].seriesid,
         Err(_)     => {
-            let _ = write!(stderr, "TV series: {}\n", &arguments.series_name);
+            let _ = write!(stderr, "tv-renamer: invalid TV series: {}\n", &arguments.series_name);
             process::exit(1);
         }
     };
@@ -102,7 +102,7 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
                 }
 
                 // If dry run or verbose is enabled, print the action being taken
-                if arguments.verbose || arguments.dry_run {
+                if arguments.flags & (DRY_RUN + VERBOSE) != 0 {
                     let _ = stdout.write(b"\x1b[1m\x1b[32m");
                     let _ = write!(stdout, "{:?}", backend::shorten_path(&source));
                     let _ = stdout.write(b"\x1b[0m -> ");
@@ -112,7 +112,7 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
                 }
 
                 // If dry run is not enabled, rename the file
-                if !arguments.dry_run {
+                if arguments.flags & DRY_RUN == 0 {
                     if let Err(cause) = fs::rename(&source, &target) {
                         let _ = write!(stderr, "tv-renamer: rename failed: {:?}\n", cause.to_string());
                         process::exit(1);
@@ -160,10 +160,10 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                     println!("{}", MAN_PAGE);
                     process::exit(0);
                 }
-                "-d" | "--dry-run" => arguments.dry_run = true,
+                "-d" | "--dry-run" => arguments.flags |= DRY_RUN,
                 "-e" | "--episode-start" => {
                     match iterator.next() {
-                        Some(value) => match value.parse::<usize>().ok() {
+                        Some(value) => match value.parse::<u16>().ok() {
                             Some(value) => arguments.episode_index = value,
                             None        => return Err(ParseError::EpisodeIndexIsNaN((*value).clone()))
                         },
@@ -178,7 +178,7 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                 },
                 "-s" | "--season-number" => {
                     match iterator.next() {
-                        Some(value) => match value.parse::<usize>().ok() {
+                        Some(value) => match value.parse::<u8>().ok() {
                             Some(value) => arguments.season_index = value,
                             None => return Err(ParseError::SeriesIndexIsNaN((*value).clone()))
                         },
@@ -193,14 +193,14 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                 },
                 "-p" | "--pad-length" => {
                     match iterator.next() {
-                        Some(value) => match value.parse::<usize>().ok() {
+                        Some(value) => match value.parse::<u8>().ok() {
                             Some(value) => arguments.pad_length = value,
                             None        => return Err(ParseError::PadLengthIsNaN((*value).clone()))
                         },
                         None => return Err(ParseError::NoPadLength)
                     }
                 },
-                "-v" | "--verbose" => arguments.verbose = true,
+                "-v" | "--verbose" => arguments.flags |= VERBOSE,
                 _ => return Err(ParseError::InvalidArgument(argument.clone()))
             }
         } else if arguments.base_directory.is_empty() {

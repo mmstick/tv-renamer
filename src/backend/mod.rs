@@ -11,20 +11,21 @@ use tvdb;
 use self::tokenizer::TemplateToken as Token;
 use self::traits::Digits;
 
+pub const DRY_RUN: u8 = 1;
+pub const VERBOSE: u8 = 2;
+
 pub struct Arguments {
-    pub dry_run: bool,
-    pub verbose: bool,
-    // pub overview: bool,
+    pub flags:          u8,
+    pub season_index:   u8,
+    pub pad_length:     u8,
+    pub episode_index:  u16,
     pub base_directory: String,
-    pub series_name: String,
-    pub season_index: usize,
-    pub episode_index: usize,
-    pub pad_length: usize,
-    pub template: Vec<Token>
+    pub series_name:    String,
+    pub template:       Vec<Token>
 }
 
 pub struct Season {
-    pub season_no: usize,
+    pub season_no: u8,
     pub episodes:  Vec<PathBuf>
 }
 
@@ -54,30 +55,18 @@ pub enum ReadDirError {
 
 /// Scans a given directory to determine whether the directory contains seasons or episodes, and returns a result
 /// that matches the situation.
-pub fn scan_directory<P: AsRef<Path> + Copy>(directory: P, season_no: usize) -> Result<ScanDir, ReadDirError> {
-    // Attempt to determine whether the input directory contains seasons, episodes, or has invalid file entries
-    let status = fs::read_dir(directory).ok().map_or(Err(ReadDirError::UnableToReadDir), |entries| {
-        for entry in entries {
-            match entry.map(|entry| entry.path()).ok() {
-                None => return Err(ReadDirError::InvalidDirEntry),
-                Some(directory) => {
-                    if directory.is_dir() && directory.to_str().unwrap().to_lowercase().contains("season") {
-                        return Ok(true)
-                    }
+pub fn scan_directory<P: AsRef<Path> + Copy>(directory: P, season_no: u8) -> Result<ScanDir, ReadDirError> {
+    for entry in fs::read_dir(directory).map_err(|_| ReadDirError::UnableToReadDir)? {
+        match entry.map(|entry| entry.path()).ok() {
+            None => return Err(ReadDirError::InvalidDirEntry),
+            Some(directory) => {
+                if directory.is_dir() && directory.to_str().unwrap().to_lowercase().contains("season") {
+                    return get_seasons(directory).map(ScanDir::Seasons);
                 }
             }
         }
-        Ok(false)
-    });
-
-    match status {
-        // If the directory contains season folders, return a list of seasons.
-        Ok(true)  => get_seasons(directory).map(ScanDir::Seasons),
-        // If the directory does not contain season folders, return a list of episodes
-        Ok(false) => get_episodes(directory, season_no).map(ScanDir::Episodes),
-        // If an error occurred, return the error
-        Err(why)  => Err(why)
     }
+    get_episodes(directory, season_no).map(ScanDir::Episodes)
 }
 
 pub enum TargetErr {
@@ -85,7 +74,7 @@ pub enum TargetErr {
 }
 
 /// Target requires source path, template tokens, episode number, and name of TV series
-pub fn collect_target(source: &Path, season_no: usize, episode_no: usize, arguments: &Arguments,
+pub fn collect_target(source: &Path, season_no: u8, episode_no: u16, arguments: &Arguments,
     tvdb_api: &tvdb::Tvdb, tvdb_series_id: u32)-> Result<PathBuf, TargetErr>
 {
     let episode = match tvdb_api.episode(tvdb_series_id, season_no as u32, episode_no as u32) {
@@ -99,7 +88,7 @@ pub fn collect_target(source: &Path, season_no: usize, episode_no: usize, argume
             Token::Character(value) => filename.push(value),
             Token::Series           => filename.push_str(&arguments.series_name),
             Token::Season           => filename.push_str(&season_no.to_string()),
-            Token::Episode          => filename.push_str(&episode_no.to_padded_string('0', arguments.pad_length)),
+            Token::Episode          => filename.push_str(&episode_no.to_padded_string('0', arguments.pad_length as usize)),
             Token::TvdbTitle        => filename.push_str(&episode.episode_name),
             Token::TvdbFirstAired   => if let Some(date) = episode.first_aired.clone() {
                 filename.push_str(&date.year.to_string());
@@ -121,10 +110,8 @@ fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError
     let entries = fs::read_dir(directory).unwrap();
     let mut seasons = Vec::new();
     for entry in entries {
-        match entry {
-            Ok(entry) => if entry.path().is_dir() { seasons.push(entry.path()); },
-            Err(_)    => return Err(ReadDirError::InvalidDirEntry)
-        }
+        let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry)?;
+        if entry.path().is_dir() { seasons.push(entry.path()); }
     }
     seasons.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
 
@@ -132,10 +119,8 @@ fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError
     let mut output: Vec<Season> = Vec::new();
     for season in seasons {
         if let Some(number) = derive_season_number(&season) {
-            match get_episodes(&season, number) {
-                Err(why)   => return Err(why),
-                Ok(season) => output.push(season)
-            }
+            let season = get_episodes(&season, number)?;
+            output.push(season);
         }
     }
     Ok(output)
@@ -143,7 +128,7 @@ fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError
 
 
 /// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
-fn get_episodes<P: AsRef<Path>>(directory: P, season_no: usize) -> Result<Season, ReadDirError> {
+fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, ReadDirError> {
     // Collect a list of video extensions
     let video_extensions = match mimetypes::get_video_extensions() {
         Err(mimetypes::MimeError::OpenFile)         => return Err(ReadDirError::MimeFileErr),
@@ -155,21 +140,18 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: usize) -> Result<Season
     let mut episodes = Vec::with_capacity(32);
     let entries = fs::read_dir(directory).unwrap();
     for entry in entries {
-        let status = entry.ok().map_or(Some(ReadDirError::InvalidDirEntry), |entry| {
-            let path = entry.path();
-            if path.is_file() {
-                // Only collect videos from a list of known supported video extensions.
-                for extension in &video_extensions {
-                    // Only collect files that contain extensions
-                    path.extension().map(|entry| {
-                        // If the video extension matches the current file, append it to the list of episodes.
-                        if extension.as_str() == entry.to_str().unwrap() { episodes.push(path.clone()); }
-                    });
-                }
+        let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry)?;
+        let path = entry.path();
+        if path.is_file() {
+            // Only collect videos from a list of known supported video extensions.
+            for extension in &video_extensions {
+                // Only collect files that contain extensions
+                path.extension().map(|entry| {
+                    // If the video extension matches the current file, append it to the list of episodes.
+                    if extension.as_str() == entry.to_str().unwrap() { episodes.push(path.clone()); }
+                });
             }
-            None
-        });
-        if status.is_some() { return Err(status.unwrap()); }
+        }
     }
     episodes.sort_by(|a, b| a.to_string_lossy().to_lowercase().cmp(&b.to_string_lossy().to_lowercase()));
 
@@ -178,14 +160,14 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: usize) -> Result<Season
 }
 
 /// Given a directory path, derive the number of the season and assign it.
-pub fn derive_season_number(season: &Path) -> Option<usize> {
+pub fn derive_season_number(season: &Path) -> Option<u8> {
     let mut directory_name = season.file_name().unwrap().to_str().unwrap().to_lowercase();
     match directory_name.as_str() {
         "season0" | "season 0" | "specials" => Some(0),
         _ => {
             directory_name = directory_name.replace("season", "");
             directory_name = directory_name.replace(" ", "");
-            directory_name.parse::<usize>().ok()
+            directory_name.parse::<u8>().ok()
         }
     }
 }
