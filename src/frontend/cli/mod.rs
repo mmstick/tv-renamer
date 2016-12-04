@@ -124,9 +124,7 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
                 let _ = stderr.write(b"tv-renamer: unable to find ");
                 match why {
                     // The episode number was unable to be found in the TV series.
-                    TargetErr::EpisodeDoesNotExist => {
-                        let _ = write!(stderr, "episode {}\n", episode_no);
-                    }
+                    TargetErr::EpisodeDoesNotExist => { let _ = write!(stderr, "episode {}\n", episode_no); }
                 }
                 process::exit(1);
             }
@@ -162,43 +160,26 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                 }
                 "-d" | "--dry-run" => arguments.flags |= DRY_RUN,
                 "-e" | "--episode-start" => {
-                    match iterator.next() {
-                        Some(value) => match value.parse::<u16>().ok() {
-                            Some(value) => arguments.episode_index = value,
-                            None        => return Err(ParseError::EpisodeIndexIsNaN((*value).clone()))
-                        },
-                        None => return Err(ParseError::NoEpisodeIndex)
-                    }
+                    let value = iterator.next().ok_or(ParseError::NoEpisodeIndex)?;
+                    arguments.episode_index = value.parse::<u16>()
+                        .map_err(|_| ParseError::EpisodeIndexIsNaN((*value).clone()))?;
                 },
                 "-n" | "--series-name" => {
-                    match iterator.next() {
-                        Some(value) => arguments.series_name.push_str(value),
-                        None        => return Err(ParseError::NoSeriesName)
-                    }
+                    arguments.series_name.push_str(iterator.next().ok_or(ParseError::NoSeriesName)?);
                 },
                 "-s" | "--season-number" => {
-                    match iterator.next() {
-                        Some(value) => match value.parse::<u8>().ok() {
-                            Some(value) => arguments.season_index = value,
-                            None => return Err(ParseError::SeriesIndexIsNaN((*value).clone()))
-                        },
-                        None => return Err(ParseError::NoSeriesIndex)
-                    }
+                    let value = iterator.next().ok_or(ParseError::NoSeriesIndex)?;
+                    arguments.season_index = value.parse::<u8>()
+                        .map_err(|_| ParseError::SeriesIndexIsNaN((*value).clone()))?;
                 },
                 "-t" | "--template" => {
-                    match iterator.next() {
-                        Some(value) => arguments.template = tokenizer::tokenize_template(value),
-                        None        => return Err(ParseError::NoTemplate)
-                    }
+                    let value = iterator.next().ok_or(ParseError::NoTemplate)?;
+                    arguments.template = tokenizer::tokenize_template(value);
                 },
                 "-p" | "--pad-length" => {
-                    match iterator.next() {
-                        Some(value) => match value.parse::<u8>().ok() {
-                            Some(value) => arguments.pad_length = value,
-                            None        => return Err(ParseError::PadLengthIsNaN((*value).clone()))
-                        },
-                        None => return Err(ParseError::NoPadLength)
-                    }
+                    let value = iterator.next().ok_or(ParseError::NoPadLength)?;
+                    arguments.pad_length = value.parse::<u8>()
+                        .map_err(|_| ParseError::PadLengthIsNaN((*value).clone()))?;
                 },
                 "-v" | "--verbose" => arguments.flags |= VERBOSE,
                 _ => return Err(ParseError::InvalidArgument(argument.clone()))
@@ -212,13 +193,8 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
 
     // Set to current working directory if no directory argument is given.
     if arguments.base_directory.is_empty() {
-        match env::current_dir() {
-            Ok(directory) => match directory.to_str() {
-                Some(directory) => arguments.base_directory = directory.to_owned(),
-                None            => return Err(ParseError::CWDNotValid)
-            },
-            Err(_) => return Err(ParseError::NoCWD)
-        }
+        let directory = env::current_dir().map_err(|_| ParseError::NoCWD)?;
+        arguments.base_directory = directory.to_str().ok_or(ParseError::CWDNotValid)?.to_owned();
     }
 
     // If no series name was given, set the series name to the base directory

@@ -55,17 +55,19 @@ pub enum ReadDirError {
 
 /// Scans a given directory to determine whether the directory contains seasons or episodes, and returns a result
 /// that matches the situation.
-pub fn scan_directory<P: AsRef<Path> + Copy>(directory: P, season_no: u8) -> Result<ScanDir, ReadDirError> {
-    for entry in fs::read_dir(directory).map_err(|_| ReadDirError::UnableToReadDir)? {
-        match entry.map(|entry| entry.path()).ok() {
-            None => return Err(ReadDirError::InvalidDirEntry),
-            Some(directory) => {
-                if directory.is_dir() && directory.to_str().unwrap().to_lowercase().contains("season") {
-                    return get_seasons(directory).map(ScanDir::Seasons);
-                }
-            }
+pub fn scan_directory<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<ScanDir, ReadDirError> {
+    // Attempt to read a list of files in a given directory
+    for entry in fs::read_dir(directory.as_ref()).map_err(|_| ReadDirError::UnableToReadDir)? {
+        // Check if the current entry is valid and return an error if not.
+        let entry = entry.map(|entry| entry.path()).map_err(|_| ReadDirError::InvalidDirEntry)?;
+
+        // If the entry is a directory and the directory contains `season`, return a list of seasons
+        if entry.is_dir() && entry.to_str().unwrap().to_lowercase().contains("season") {
+            return get_seasons(entry).map(ScanDir::Seasons);
         }
     }
+
+    // If the directory does not contain season directories, return a list of episodes.
     get_episodes(directory, season_no).map(ScanDir::Episodes)
 }
 
@@ -77,10 +79,8 @@ pub enum TargetErr {
 pub fn collect_target(source: &Path, season_no: u8, episode_no: u16, arguments: &Arguments,
     tvdb_api: &tvdb::Tvdb, tvdb_series_id: u32)-> Result<PathBuf, TargetErr>
 {
-    let episode = match tvdb_api.episode(tvdb_series_id, season_no as u32, episode_no as u32) {
-        Ok(episode) => episode,
-        Err(_)      => return Err(TargetErr::EpisodeDoesNotExist)
-    };
+    let episode = tvdb_api.episode(tvdb_series_id, season_no as u32, episode_no as u32)
+        .map_err(|_| TargetErr::EpisodeDoesNotExist)?;
 
     let mut filename = String::with_capacity(64);
     for pattern in &arguments.template {
@@ -113,6 +113,7 @@ fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError
         let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry)?;
         if entry.path().is_dir() { seasons.push(entry.path()); }
     }
+
     seasons.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
 
     // Then, collect all of the episodes that belong to each season, numbering them accordingly to their name.
@@ -123,6 +124,7 @@ fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError
             output.push(season);
         }
     }
+
     Ok(output)
 }
 
@@ -153,6 +155,7 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, R
             }
         }
     }
+
     episodes.sort_by(|a, b| a.to_string_lossy().to_lowercase().cmp(&b.to_string_lossy().to_lowercase()));
 
     // Return the list of episodes as a `Season` with the accompanying season number.

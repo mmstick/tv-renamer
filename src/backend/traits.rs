@@ -57,16 +57,16 @@ impl Digits for u32 {
 
 #[test]
 fn test_digits() {
-    assert_eq!(1.digits(), 1);
-    assert_eq!(9.digits(), 1);
-    assert_eq!(10.digits(), 2);
-    assert_eq!(100.digits(), 3);
+    assert_eq!(1u16.digits(), 1);
+    assert_eq!(9u16.digits(), 1);
+    assert_eq!(10u16.digits(), 2);
+    assert_eq!(100u16.digits(), 3);
 }
 #[test]
 fn test_padded_digits() {
-    assert_eq!(5.to_padded_string('0', 2).as_str(), "05");
-    assert_eq!(10.to_padded_string('0', 2).as_str(), "10");
-    assert_eq!(100.to_padded_string('0', 2).as_str(), "100");
-    assert_eq!(10.to_padded_string('0', 3).as_str(), "010");
-    assert_eq!(5.to_padded_string('0', 3).as_str(), "005");
+    assert_eq!(5u16.to_padded_string('0', 2).as_str(), "05");
+    assert_eq!(10u16.to_padded_string('0', 2).as_str(), "10");
+    assert_eq!(100u16.to_padded_string('0', 2).as_str(), "100");
+    assert_eq!(10u16.to_padded_string('0', 3).as_str(), "010");
+    assert_eq!(5u16.to_padded_string('0', 3).as_str(), "005");
 }
