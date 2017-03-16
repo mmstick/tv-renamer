@@ -133,6 +133,9 @@ pub fn interface() {
         });
     }
 
+    // Fix WM_CLASS
+    window.set_wmclass ("tv-renamer", "Tv-renamer");
+    
     window.show_all();
     info_bar.hide();
 
