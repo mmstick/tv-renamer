@@ -16,7 +16,7 @@ const SN_NO_VAL: &'static str = "no value was set for the season number.\n";
 const PD_NO_VAL: &'static str = "no value was set for the pad length.\n";
 const TMP_NO_VAL:&'static str = "no value was set for the template.\n";
 
-pub fn interface(args: &[String]) {
+pub fn interface<A: Iterator<Item = String>>(args: A) {
     let stderr = &mut io::stderr();
 
     // Default CLI arguments
@@ -60,6 +60,7 @@ pub fn interface(args: &[String]) {
         Err(why) => {
             let _ = stderr.write(b"tv-renamer: ");
             let message: &[u8] = match why {
+                ReadDirError::MimeDirErr      => b"unable to read /usr/share/mime/video/",
                 ReadDirError::UnableToReadDir => b"unable to read directory",
                 ReadDirError::InvalidDirEntry => b"directory entry is invalid",
                 ReadDirError::MimeFileErr     => b"unable to open /etc/mime.types",
@@ -149,8 +150,10 @@ enum ParseError {
 }
 
 /// Parse command-line arguments and update the `arguments` structure accordingly.
-fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), ParseError> {
-    let mut iterator = args.iter();
+fn parse_arguments <A: Iterator<Item = String>> (
+    arguments: &mut Arguments,
+    mut iterator: A
+) -> Result<(), ParseError> {
     while let Some(argument) = iterator.next() {
         if argument.starts_with('-') {
             match argument.as_str() {
@@ -162,32 +165,32 @@ fn parse_arguments(arguments: &mut Arguments, args: &[String]) -> Result<(), Par
                 "-e" | "--episode-start" => {
                     let value = iterator.next().ok_or(ParseError::NoEpisodeIndex)?;
                     arguments.episode_index = value.parse::<u16>()
-                        .map_err(|_| ParseError::EpisodeIndexIsNaN((*value).clone()))?;
+                        .map_err(|_| ParseError::EpisodeIndexIsNaN(value))?;
                 },
                 "-n" | "--series-name" => {
-                    arguments.series_name.push_str(iterator.next().ok_or(ParseError::NoSeriesName)?);
+                    arguments.series_name.push_str(&iterator.next().ok_or(ParseError::NoSeriesName)?);
                 },
                 "-s" | "--season-number" => {
                     let value = iterator.next().ok_or(ParseError::NoSeriesIndex)?;
                     arguments.season_index = value.parse::<u8>()
-                        .map_err(|_| ParseError::SeriesIndexIsNaN((*value).clone()))?;
+                        .map_err(|_| ParseError::SeriesIndexIsNaN(value))?;
                 },
                 "-t" | "--template" => {
                     let value = iterator.next().ok_or(ParseError::NoTemplate)?;
-                    arguments.template = tokenizer::tokenize_template(value);
+                    arguments.template = tokenizer::tokenize_template(&value);
                 },
                 "-p" | "--pad-length" => {
                     let value = iterator.next().ok_or(ParseError::NoPadLength)?;
                     arguments.pad_length = value.parse::<u8>()
-                        .map_err(|_| ParseError::PadLengthIsNaN((*value).clone()))?;
+                        .map_err(|_| ParseError::PadLengthIsNaN(value))?;
                 },
                 "-v" | "--verbose" => arguments.flags |= VERBOSE,
-                _ => return Err(ParseError::InvalidArgument(argument.clone()))
+                _ => return Err(ParseError::InvalidArgument(argument))
             }
         } else if arguments.base_directory.is_empty() {
-            arguments.base_directory = argument.clone();
+            arguments.base_directory = argument;
         } else {
-            return Err(ParseError::TooManyArguments(argument.clone()));
+            return Err(ParseError::TooManyArguments(argument));
         }
     }
 

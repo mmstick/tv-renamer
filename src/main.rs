@@ -10,15 +10,10 @@ mod frontend {
 use std::env;
 
 fn main() {
-    let arguments = env::args().skip(1).collect::<Vec<String>>();
-    match arguments.get(0) {
-        Some(command) => {
-            match command.as_str() {
-                "cli" => frontend::cli::interface(&arguments[1..]),
-                "gtk" => frontend::gtk3::interface(),
-                _     => frontend::cli::interface(&arguments)
-            }
-        },
-        None => frontend::cli::interface(&arguments)
+    let mut arguments = env::args();
+    if arguments.next().unwrap().ends_with("tv-renamer-gtk") {
+        frontend::gtk3::interface();
+    } else {
+        frontend::cli::interface(arguments);
     }
 }

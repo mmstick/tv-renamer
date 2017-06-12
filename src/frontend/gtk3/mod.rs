@@ -135,7 +135,7 @@ pub fn interface() {
 
     // Fix WM_CLASS
     window.set_wmclass ("tv-renamer", "Tv-renamer");
-    
+
     window.show_all();
     info_bar.hide();
 
@@ -187,6 +187,7 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
         Err(why) => {
             info_bar.set_message_type(gtk::MessageType::Error);
             notification_label.set_text(match why {
+                ReadDirError::MimeDirErr      => "unable to read /usr/share/mime/video/",
                 ReadDirError::UnableToReadDir => "Unable to read directory",
                 ReadDirError::InvalidDirEntry => "Directory entry is invalid",
                 ReadDirError::MimeFileErr     => "Unable to open /etc/mime.types",

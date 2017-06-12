@@ -6,17 +6,17 @@ all:
 
 install:
 	install -Dm 755 "target/release/tv-renamer" "${DESTDIR}/bin/tv-renamer"
-	install -Dm 755 "assets/tv-renamer-gtk" "${DESTDIR}/bin/tv-renamer-gtk"
+	ln -sf "${DESTDIR}/bin/tv-renamer" "${DESTDIR}/bin/tv-renamer-gtk"
 	install -Dm 644 "assets/tv-renamer.desktop" "${DESTDIR}/share/applications/tv-renamer.desktop"
 	install -Dm 644 README.md "${DESTDIR}/share/doc/tv-renamer/README"
 	install -Dm 644 LICENSE "${DESTDIR}/share/licenses/tv-renamer/COPYING"
 
 tar:
-	install -Dm 755 "assets/tv-renamer-gtk" "tv-renamer/bin/tv-renamer-gtk"
 	install -Dm 755 "target/release/tv-renamer" "tv-renamer/bin/tv-renamer"
+	ln -sf "tv-renamer/bin/tv-renamer" "tv-renamer/bin/tv-renamer-gtk"
 	install -Dm 644 "assets/tv-renamer.desktop" "tv-renamer/share/applications/tv-renamer.desktop"
 	install -Dm 644 README.md "tv-renamer/share/doc/tv-renamer/README"
-	install -Dm 655 LICENSE "tv-renamer/share/licenses/tv-renamer/COPYING"
+	install -Dm 644 LICENSE "tv-renamer/share/licenses/tv-renamer/COPYING"
 	tar cf - "tv-renamer" | xz -zf > "tv-renamer_$(version)_$(shell uname -m).tar.xz"
 
 deb:
@@ -28,9 +28,9 @@ deb:
 
 
 uninstall:
-	rm "${DESTDIR}/tv-renamer"
-	rm "${DESTDIR}/tv-renamer-gtk"
-	rm "${DESTIDR}/share/applications/tv-renamer.desktop"
+	rm "${DESTDIR}/bin/tv-renamer"
+	rm "${DESTDIR}/bin/tv-renamer-gtk"
+	rm "${DESTDIR}/share/applications/tv-renamer.desktop"
 	rm "${DESTDIR}/share/doc/tv-renamer/README"
 	rm "${DESTDIR}/share/licenses/tv-renamer/COPYING"
 
