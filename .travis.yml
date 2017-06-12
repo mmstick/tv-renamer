@@ -1,18 +1,68 @@
+dist: trusty
 language: rust
+services: docker
+sudo: required
+
 env:
+  global:
+    - CRATE_NAME=tv-renamer
     - GTK=3.18
+    - PKG_CONFIG_ALLOW_CROSS=1
+    - LD_LIBRARY_PATH="$HOME/local/lib/"
+    - PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
+
 addons:
   apt:
     packages:
     - libgtk-3-dev
+
+matrix:
+  include:
+    # Linux
+    - env: TARGET=i686-unknown-linux-gnu
+    - env: TARGET=x86_64-unknown-linux-gnu
+
+before_install: set -e
+
+install:
+  - sh ci/install.sh
+  - source ~/.cargo/env || true
+
 script:
-    # Update GTK3 in Docker image
-    - WD="$PWD"
-    - cd "$HOME"
-    - curl -LO "https://github.com/gkoz/gtk-bootstrap/releases/download/gtk-3.18.1-2/deps.txz"
-    - tar xf deps.txz
-    - cd "$WD"
-    - export PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
-    - export LD_LIBRARY_PATH="$HOME/local/lib/"
-    # Build the application
-    - cargo build --verbose
+  - WD="$PWD"
+  - cd "$HOME"
+  - curl -LO "https://github.com/gkoz/gtk-bootstrap/releases/download/gtk-3.18.1-2/deps.txz"
+  - tar xf deps.txz
+  - cd "$WD"
+  - bash ci/script.sh
+
+after_script: set +e
+
+before_deploy:
+  - sh ci/before_deploy.sh
+
+deploy:
+  api_key:
+    secure: CC4ItBrv0AHXSZCiyTlVPz4hcb8bF2BXCHLAbbPL/l/wrMqJIWHP4DccA0h60rS+DeoO5igSZsVfK7Qau5cfWKK4H50sHldhp/hpCiO8aaZ75tQFsn3H+cN2Eol6+Q8GJGyXb6tkAxMqi2qBsv5DlJQ4UAr2KF5Z/tieBzGqmY0eFs3CTQ3kC4T6ZaOR61zV4x8MddFAXpJsarTbgKG0yDLw5ra5JZlQlllUCZ/z4gWpOGZKcJDWo4B4r5ecjfOZ095YcZp5RzcZDu65FCCmh4W0wVt4+vrD+s9ShKwTUOrsyFJVhKuUKKudKHLRRH0gv0Cgx4hgr/QTZj5JO5fGkj3QmQ0u3O+q/NIDHBNtITWepNcj78yk56UowIP9NsBDVvWLNB5wyGqr8nKS4nwWavaPEq3et101UByYKdIO1044rrnweqsX4iX9NOvfPpF+8aCO4gWDvX6yFKWzoOpeODlv58Qxv4xKC3ddkKQDUzd/yRELlkOUg3G57NKpMj6wA/HlILEUjDXOAGVjwSsOJbXXSgtSW5tu+6DRpsmhYd/93TvCoxnMHzDZ3qCgYlVuIco48SH87j+regwMBqwYoF4dKQ0bUnMqnaEphWHCGKzinbURS1hYrtlmpC/3ZgAZ4MrSXxWfvft5fF10BvfPEJWbWWBcyaaXoPlIys101UM=
+  file_glob: true
+  file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.*
+  on:
+    condition: $TRAVIS_RUST_VERSION = stable
+    tags: true
+  provider: releases
+  skip_cleanup: true
+
+cache: cargo
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
+
+branches:
+  only:
+    # release tags
+    - /^v\d+\.\d+\.\d+.*$/
+    - master
+
+notifications:
+  email:
+    on_success: never

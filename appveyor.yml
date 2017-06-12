@@ -1,8 +1,17 @@
+# Based on the "trust" template v0.1.1
+# https://github.com/japaric/trust/tree/v0.1.1
+
 environment:
+  global:
+    RUST_VERSION: stable
+    CRATE_NAME: tv-renamer
+
   matrix:
-    - RUST: stable
+    # Windows
+    - TARGET: i686-pc-windows-gnu
       BITS: 32
-    - RUST: stable
+
+    - TARGET: x86_64-pc-windows-gnu
       BITS: 64
 
 install:
@@ -19,10 +28,40 @@ install:
   - cargo -V
   - pacman --noconfirm -S mingw-w64-%ARCH%-gtk3
 
-build_script:
-  - mkdir .cargo
-  - echo paths = ["."] > .cargo\config
-  - git clone -q https://github.com/mmstick/tv-renamer
-  - cargo build
+test_script:
+  - if [%APPVEYOR_REPO_TAG%]==[false] (
+      cargo build --target %TARGET% &&
+      cargo build --target %TARGET% --release &&
+      cargo test --target %TARGET% &&
+      cargo test --target %TARGET% --release
+    )
 
-test: false
+before_deploy:
+  - cargo rustc --target %TARGET% --release
+  - ps: ci\before_deploy.ps1
+
+deploy:
+  artifact: /.*\.zip/
+  auth_token:
+    secure: TQTFQzQN0mGOVWG8hxIOBFGixKTjxRFYN0lB+OCYW2gepNfvAAbXUScL1GKYwTDH
+  description: ''
+  on:
+    RUST_VERSION: stable
+    appveyor_repo_tag: true
+  provider: GitHub
+
+cache:
+  - C:\Users\appveyor\.cargo\registry
+  - target
+
+branches:
+  only:
+    # Release tags
+    - /^v\d+\.\d+\.\d+.*$/
+    - master
+
+notifications:
+  - provider: Email
+    on_build_success: false
+
+build: false

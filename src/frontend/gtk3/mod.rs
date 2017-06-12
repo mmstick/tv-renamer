@@ -1,4 +1,4 @@
-use backend::{self, Arguments, ReadDirError, ScanDir, Season, tokenizer, DRY_RUN};
+use backend::{self, Arguments, ScanDir, Season, tokenizer, DRY_RUN};
 
 use gdk::enums::key;
 use gtk::prelude::*;
@@ -6,6 +6,7 @@ use gtk::{
     self, Builder, Button, Entry, FileChooserDialog, ListStore,
     SpinButton, TreeView, TreeViewColumn, Type, Window, WindowType
 };
+use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tvdb;
@@ -186,13 +187,7 @@ fn rename_series(args: &Arguments, preview_list: &ListStore, info_bar: &gtk::Inf
         },
         Err(why) => {
             info_bar.set_message_type(gtk::MessageType::Error);
-            notification_label.set_text(match why {
-                ReadDirError::MimeDirErr      => "unable to read /usr/share/mime/video/",
-                ReadDirError::UnableToReadDir => "Unable to read directory",
-                ReadDirError::InvalidDirEntry => "Directory entry is invalid",
-                ReadDirError::MimeFileErr     => "Unable to open /etc/mime.types",
-                ReadDirError::MimeStringErr   => "Unable to read /etc/mime.types to string"
-            });
+            notification_label.set_text(why.description());
         }
     }
     info_bar.show();

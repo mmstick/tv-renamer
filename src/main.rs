@@ -1,6 +1,8 @@
 extern crate tvdb;
 extern crate gtk;
 extern crate gdk;
+#[macro_use] extern crate quick_error;
+
 mod backend;
 mod frontend {
     pub mod cli;

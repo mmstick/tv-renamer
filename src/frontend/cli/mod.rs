@@ -1,5 +1,5 @@
 mod man;
-use backend::{self, Arguments, Season, ScanDir, ReadDirError, TargetErr};
+use backend::{self, Arguments, Season, ScanDir, TargetErr};
 use backend::tokenizer;
 use self::man::MAN_PAGE;
 use std::env;
@@ -58,16 +58,7 @@ pub fn interface<A: Iterator<Item = String>>(args: A) {
         Ok(ScanDir::Seasons(seasons)) => for season in seasons { rename_season(stderr, &season, &arguments, 1); },
         // If an error occurred, print an error and exit.
         Err(why) => {
-            let _ = stderr.write(b"tv-renamer: ");
-            let message: &[u8] = match why {
-                ReadDirError::MimeDirErr      => b"unable to read /usr/share/mime/video/",
-                ReadDirError::UnableToReadDir => b"unable to read directory",
-                ReadDirError::InvalidDirEntry => b"directory entry is invalid",
-                ReadDirError::MimeFileErr     => b"unable to open /etc/mime.types",
-                ReadDirError::MimeStringErr   => b"unable to read /etc/mime.types to string"
-            };
-            let _ = stderr.write(message);
-            let _ = stderr.write(b"\n");
+            let _ = writeln!(stderr, "tv-renamer: {}", why);
             process::exit(1);
         }
     }
@@ -93,11 +84,18 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
             Ok(target) => {
                 // If the target exists, do not overwrite the target without first asking if it is OK.
                 if target.exists() {
-                    println!("tv-renamer: episode to be renamed already exists:\n{:?}\nIs it okay to overwrite? (y/n)", &target);
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "tv-renamer: episode to be renamed already exists:\n{:?}\nIs it okay to overwrite? (y/n)", &target);
                     let mut input = [b'n'; 1];
-                    io::stdin().read_exact(&mut input).unwrap();
+
+                    if let Err(why) = io::stdin().read_exact(&mut input) {
+                        let _ = writeln!(stderr, "tv-renamer: error reading from standard input: {:?}", why);
+                        process::exit(1);
+                    }
+
                     if input[0] != b'y' {
-                        println!("tv-renamer: stopping the renaming process.\n");
+                        let _ = stderr.write_all(b"tv-renamer: stopping the renaming process.\n");
                         process::exit(1);
                     }
                 }
@@ -115,17 +113,25 @@ fn rename_season(stderr: &mut io::Stderr, season: &Season, arguments: &Arguments
                 // If dry run is not enabled, rename the file
                 if arguments.flags & DRY_RUN == 0 {
                     if let Err(cause) = fs::rename(&source, &target) {
-                        let _ = write!(stderr, "tv-renamer: rename failed: {:?}\n", cause.to_string());
+                        let _ = writeln!(stderr, "tv-renamer: rename failed: {:?}", cause.to_string());
                         process::exit(1);
                     }
                 }
 
             },
             Err(why) => {
-                let _ = stderr.write(b"tv-renamer: unable to find ");
+                let _ = stderr.write(b"tv-renamer: ");
                 match why {
                     // The episode number was unable to be found in the TV series.
-                    TargetErr::EpisodeDoesNotExist => { let _ = write!(stderr, "episode {}\n", episode_no); }
+                    TargetErr::EpisodeDoesNotExist => {
+                        let _ = writeln!(stderr, "unable to find episode {}", episode_no);
+                    },
+                    TargetErr::Extension => {
+                        let _ = writeln!(stderr, "unable to get extension");
+                    },
+                    TargetErr::Parent => {
+                        let _ = writeln!(stderr, "unable to get parent filepath");
+                    }
                 }
                 process::exit(1);
             }

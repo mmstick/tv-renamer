@@ -29,6 +29,7 @@ assets = [
 tvdb = "0.4"
 gtk = { version = "0.1", features = ["v3_14"] }
 gdk = { version = "0.5" }
+quick-error = "1.2"
 
 [profile.release]
 debug = false

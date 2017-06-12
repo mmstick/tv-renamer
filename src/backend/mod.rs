@@ -3,14 +3,18 @@ pub mod tokenizer;
 mod mimetypes;
 
 use std::env;
-use std::fs;
+use std::fs::{self, ReadDir};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 
 use tvdb;
 
-use self::mimetypes::MimeError;
 use self::tokenizer::TemplateToken as Token;
 use self::traits::Digits;
+
+macro_rules! lowercase {
+    ($path:ident) => { $path.to_string_lossy().to_lowercase() }
+}
 
 pub const DRY_RUN: u8 = 1;
 pub const VERBOSE: u8 = 2;
@@ -48,21 +52,17 @@ pub enum ScanDir {
     Seasons(Vec<Season>)
 }
 
-pub enum ReadDirError {
-    UnableToReadDir,
-    InvalidDirEntry,
-    MimeDirErr,
-    MimeFileErr,
-    MimeStringErr
-}
-
-impl From<MimeError> for ReadDirError {
-    fn from(err: MimeError) -> ReadDirError {
-        match err {
-            MimeError::OpenEntry        => ReadDirError::InvalidDirEntry,
-            MimeError::OpenDir          => ReadDirError::MimeDirErr,
-            MimeError::OpenFile         => ReadDirError::MimeFileErr,
-            MimeError::ReadFileToString => ReadDirError::MimeStringErr
+quick_error! {
+    #[derive(Debug)]
+    pub enum ReadDirError {
+        UnableToReadDir(dir: PathBuf) {
+            display("unable to read {:?} directory.", dir)
+        }
+        InvalidDirEntry(dir: PathBuf) {
+            display("unable to read entry in {:?}.", dir)
+        }
+        MimeError(err: Error) {
+            display("error obtaining video extensions from /usr/share/mime/video: {}", err)
         }
     }
 }
@@ -70,13 +70,15 @@ impl From<MimeError> for ReadDirError {
 /// Scans a given directory to determine whether the directory contains seasons or episodes, and returns a result
 /// that matches the situation.
 pub fn scan_directory<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<ScanDir, ReadDirError> {
+    let directory: &Path = directory.as_ref();
     // Attempt to read a list of files in a given directory
-    for entry in fs::read_dir(directory.as_ref()).map_err(|_| ReadDirError::UnableToReadDir)? {
+    for entry in fs::read_dir(directory).map_err(|_| ReadDirError::UnableToReadDir(directory.to_path_buf()))? {
         // Check if the current entry is valid and return an error if not.
-        let entry = entry.map(|entry| entry.path()).map_err(|_| ReadDirError::InvalidDirEntry)?;
+        let entry = entry.map(|entry| entry.path())
+            .map_err(|_| ReadDirError::InvalidDirEntry(directory.to_path_buf()))?;
 
         // If the entry is a directory and the directory contains `season`, return a list of seasons
-        if entry.is_dir() && entry.to_str().unwrap().to_lowercase().contains("season") {
+        if entry.to_str().map(|s| s.to_lowercase().contains("season") && entry.is_dir()).unwrap_or(false) {
             return get_seasons(directory).map(ScanDir::Seasons);
         }
     }
@@ -86,7 +88,9 @@ pub fn scan_directory<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Sca
 }
 
 pub enum TargetErr {
-    EpisodeDoesNotExist
+    EpisodeDoesNotExist,
+    Extension,
+    Parent
 }
 
 /// Target requires source path, template tokens, episode number, and name of TV series
@@ -114,16 +118,28 @@ pub fn collect_target(source: &Path, season_no: u8, episode_no: u16, arguments: 
         }
     }
 
-    filename = filename.trim().replace("/", "-") + "." + source.extension().unwrap().to_str().unwrap();
-    Ok(PathBuf::from(source.parent().unwrap()).join(filename))
+    let extension = source.extension()
+        .and_then(|s| s.to_str())
+        .ok_or(TargetErr::Extension)?;
+
+    filename = [&filename.trim().replace("/", "-"), ".", &extension].concat();
+
+    source.parent()
+        .map(|parent| PathBuf::from(parent).join(filename))
+        .ok_or(TargetErr::Parent)
+}
+
+fn read_directory(directory: &Path) -> Result<ReadDir, ReadDirError> {
+    fs::read_dir(directory).map_err(|_| ReadDirError::UnableToReadDir(directory.to_owned()))
 }
 
 /// Collects a list of all episodes belonging to each season within a given directory.
 fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError> {
+    let directory: &Path = directory.as_ref();
     let mut output: Vec<Season> = Vec::new();
 
-    for entry in fs::read_dir(directory).unwrap() {
-        let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry)?;
+    for entry in read_directory(directory)? {
+        let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry(directory.to_path_buf()))?;
         let season = entry.path();
         if season.is_dir() {
             if let Some(number) = derive_season_number(&season) {
@@ -139,8 +155,9 @@ fn get_seasons<P: AsRef<Path>>(directory: P) -> Result<Vec<Season>, ReadDirError
 
 /// Collects a list of all of the episodes in a given directory. Files that are not videos are ignored.
 fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, ReadDirError> {
+    let directory: &Path = directory.as_ref();
     // Collect a list of video extensions
-    let video_extensions = mimetypes::get_video_extensions()?;
+    let video_extensions = mimetypes::get_extensions("video").map_err(ReadDirError::MimeError)?;
 
     // It is more likely that all files will have the same extension, so it
     // will be useful to check for the last-matched extension with each
@@ -149,9 +166,8 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, R
 
     // Collect a list of episodes in the directory
     let mut episodes = Vec::with_capacity(32);
-    let entries = fs::read_dir(directory).unwrap();
-    for entry in entries {
-        let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry)?;
+    for entry in read_directory(directory)? {
+        let entry = entry.map_err(|_| ReadDirError::InvalidDirEntry(directory.to_path_buf()))?;
         let path = entry.path();
         let mut pushed = false;
         if path.is_file() {
@@ -160,7 +176,7 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, R
                 // Only collect files that contain extensions
                 path.extension().map(|entry| {
                     // If the video extension matches the current file, append it to the list of episodes.
-                    if extension.as_str() == entry.to_str().unwrap() {
+                    if Some(extension.as_str()) == entry.to_str() {
                         episodes.push(path.clone());
                         pushed = true;
                     }
@@ -173,7 +189,7 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, R
                 // Only collect files that contain extensions
                 path.extension().map(|entry| {
                     // If the video extension matches the current file, append it to the list of episodes.
-                    if extension.as_str() == entry.to_str().unwrap() {
+                    if Some(extension.as_str()) == entry.to_str() {
                         episodes.push(path.clone());
                         last_matched_extension = Some(extension.clone());
                         pushed = true;
@@ -185,7 +201,7 @@ fn get_episodes<P: AsRef<Path>>(directory: P, season_no: u8) -> Result<Season, R
         }
     }
 
-    episodes.sort_by(|a, b| a.to_string_lossy().to_lowercase().cmp(&b.to_string_lossy().to_lowercase()));
+    episodes.sort_by(|a, b| lowercase!(a).cmp(&lowercase!(b)));
 
     // Return the list of episodes as a `Season` with the accompanying season number.
     Ok(Season { season_no: season_no, episodes: episodes })
