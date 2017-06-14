@@ -46,7 +46,6 @@ deploy:
     secure: TQTFQzQN0mGOVWG8hxIOBFGixKTjxRFYN0lB+OCYW2gepNfvAAbXUScL1GKYwTDH
   description: ''
   on:
-    RUST_VERSION: stable
     appveyor_repo_tag: true
   provider: GitHub
 

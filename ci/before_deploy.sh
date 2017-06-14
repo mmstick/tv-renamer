@@ -17,7 +17,7 @@ main() {
 
     test -f Cargo.lock || cargo generate-lockfile
 
-    cross rustc --bin tv-renamer --target $TARGET --release -- -C lto
+    cargo rustc --bin tv-renamer --target $TARGET --release -- -C lto
 
     cp target/$TARGET/release/tv-renamer $stage/tv-renamer
     cp target/$TARGET/release/tv-renamer $stage/tv-renamer-gtk

@@ -7,7 +7,6 @@ env:
   global:
     - CRATE_NAME=tv-renamer
     - GTK=3.18
-    - PKG_CONFIG_ALLOW_CROSS=1
     - LD_LIBRARY_PATH="$HOME/local/lib/"
     - PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
 
@@ -18,14 +17,11 @@ addons:
 
 matrix:
   include:
-    # Linux
-    - env: TARGET=i686-unknown-linux-gnu
     - env: TARGET=x86_64-unknown-linux-gnu
 
 before_install: set -e
 
 install:
-  - sh ci/install.sh
   - source ~/.cargo/env || true
 
 script:
@@ -47,8 +43,9 @@ deploy:
   file_glob: true
   file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.*
   on:
-    condition: $TRAVIS_RUST_VERSION = stable
+    repo: mmstick/tv-renamer
     tags: true
+    all_branches: true
   provider: releases
   skip_cleanup: true
 
@@ -56,12 +53,6 @@ cache: cargo
 before_cache:
   # Travis can't cache files that are not readable by "others"
   - chmod -R a+r $HOME/.cargo
-
-branches:
-  only:
-    # release tags
-    - /^v\d+\.\d+\.\d+.*$/
-    - master
 
 notifications:
   email:
